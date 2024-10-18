@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:barcode_scan2/barcode_scan2.dart';
+import 'shared_pref_helper.dart'; // Adjust the import based on your file structure
 
 class AssetReceiving extends StatefulWidget {
   const AssetReceiving({Key? key, required String title}) : super(key: key);
@@ -12,7 +13,6 @@ class AssetReceiving extends StatefulWidget {
 
 class _AssetReceivingState extends State<AssetReceiving> {
   final List<Map<String, dynamic>> _scannedAssets = [];
-  String _personReceiving = '';
   String _assetDescription = '';
   String? _selectedStatus;
   Map<String, dynamic>? _selectedCategory;
@@ -28,15 +28,13 @@ class _AssetReceivingState extends State<AssetReceiving> {
   ];
   List<Map<String, dynamic>> _filteredLocations = [];
   final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _personReceivingController =
-  TextEditingController();
   String _serialPrefix = '';
 
   final String apiUrl = 'http://197.136.16.164:8000/app/assets/';
   final String categoryApiUrl =
-      'http://197.136.16.164:8000/app/api/category/';
+      'http://197.136.16.164:8000/app/api/categories/';
   final String locationApiUrl =
-      'http://197.136.16.164:8000/app/api/location/';
+      'http://197.136.16.164:8000/app/api/locations/';
 
   @override
   void initState() {
@@ -91,9 +89,15 @@ class _AssetReceivingState extends State<AssetReceiving> {
   }
 
   Future<void> _saveAsset(Map<String, dynamic> asset) async {
+    SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
+    String? accessToken = await sharedPrefHelper.getAccessToken(); // Retrieve access token
+
     final response = await http.post(
       Uri.parse(apiUrl),
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken', // Add authorization header
+      },
       body: jsonEncode(asset),
     );
 
@@ -109,8 +113,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
   }
 
   Future<void> _scanItem() async {
-    if (_personReceiving.isEmpty ||
-        _assetDescription.isEmpty ||
+    if (_assetDescription.isEmpty ||
         _selectedCategory == null ||
         _selectedStatus == null ||
         _location == null) {
@@ -223,6 +226,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
 
   Future<bool> _showConfirmationDialog(
       String serialNumber, String kenetTag) async {
+    SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
+    String? personReceivingId = await sharedPrefHelper.getUserId(); // Assuming you have a method to get user ID
+
     return await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -233,7 +239,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
             children: [
               Text('Serial Number: $serialNumber'),
               Text('KENET Tag: $kenetTag'),
-              Text('Person Receiving: $_personReceiving'),
+              Text('Person Receiving: $personReceivingId'),
               Text('Asset Description: $_assetDescription'),
               Text('Category: ${_selectedCategory != null ? _selectedCategory!['name'] : "Not Selected"}'),
               Text('Status: ${_selectedStatus ?? "Not Selected"}'),
@@ -246,15 +252,12 @@ class _AssetReceivingState extends State<AssetReceiving> {
               onPressed: () {
                 final asset = {
                   'date_received': DateTime.now().toIso8601String(),
-                  'person_receiving': _personReceiving,
+                  'person_receiving': personReceivingId, // Set to current user ID
                   'asset_description': _assetDescription,
                   'serial_number': serialNumber,
                   'kenet_tag': kenetTag,
                   'location': _location?['id'],
-                  'category': {
-                    'id': _selectedCategory?['id'],
-                    'name': _selectedCategory?['name']
-                  },
+                  'category': _selectedCategory?['id'],
                   'status': _selectedStatus,
                 };
                 _saveAsset(asset);
@@ -277,7 +280,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Asset Receiving'),
-        centerTitle: true,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -293,21 +295,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         children: [
-                          TextField(
-
-                            onChanged: (value) {
-                              setState(() {
-                                _personReceiving = value;
-                              });
-                            },
-                            controller: _personReceivingController,
-                            decoration: InputDecoration(
-                              labelText: 'Person Receiving',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Rounded border
-                              ),
-                            ),
-                          ),
                           const SizedBox(height: 16),
                           TextField(
                             onChanged: (value) {

@@ -5,10 +5,21 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Kenet Application</string>
+	<string>KENET Assets</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
+	<key>LSApplicationQueriesSchemes</key>
+    <array>
+      <string>https</string>
+      <string>http</string>
+    </array>
+
+    <key>NSMicrophoneUsageDescription</key>
+    <string>We need to access your microphone to recognize speech.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>We need speech recognition to convert your voice into text.</string>
+
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
