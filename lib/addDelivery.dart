@@ -2,7 +2,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:barcode_scan2/barcode_scan2.dart';
 import 'shared_pref_helper.dart'; // Adjust the import based on your file structure
 
 class DeliveryReceiving extends StatefulWidget {
