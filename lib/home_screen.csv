@@ -1,0 +1,295 @@
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:kenet_application/addDelivery.dart';
+import 'package:kenet_application/assetreceiving.dart';
+import 'package:kenet_application/delivery_screen.dart';
+import 'package:kenet_application/login_screen.dart'; // Import your Login screen
+
+class HomeScreen extends StatefulWidget {
+  final String id;
+  final String username;
+  final String firstName;
+  final String lastName;
+  final String email;
+  final String role;
+  final String accessToken;
+  final String refreshToken;
+
+  const HomeScreen({
+    Key? key,
+    required this.id,
+    required this.username,
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    required this.role,
+    required this.accessToken,
+    required this.refreshToken,
+  }) : super(key: key);
+
+  @override
+  _HomeScreenState createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<dynamic> _assets = [];
+  List<dynamic> _filteredAssets = [];
+  bool _isLoading = true;
+  String _errorMessage = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchAssets();
+    _searchController.addListener(_filterAssets); // Add listener for search input
+  }
+
+  Future<void> _fetchAssets() async {
+    final url = 'http://197.136.16.164:8000/app/api/assets/'; // Fetch all assets
+
+    try {
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> fetchedAssets = jsonDecode(response.body);
+
+        setState(() {
+          _assets = fetchedAssets; // Load all assets
+          _filteredAssets = fetchedAssets; // Initialize filtered assets
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = 'Failed to load assets. Status code: ${response.statusCode}';
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'An error occurred: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _filterAssets() {
+    String query = _searchController.text.toLowerCase();
+
+    setState(() {
+      _filteredAssets = _assets.where((asset) {
+        return asset['serial_number'].toLowerCase().contains(query) ||
+            asset['kenet_tag'].toLowerCase().contains(query);
+      }).toList();
+    });
+  }
+
+  void _navigateToAssetCreation() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => AssetReceiving(title: "Asset Receiving")),
+    );
+  }
+
+  void _navigateToDeliveries() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => DeliveriesScreen(accessToken: widget.accessToken),
+      ),
+    );
+  }
+
+  void _navigateToLogin() {
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (context) => LoginScreen()), // Navigate to your Login screen
+          (Route<dynamic> route) => false, // Remove all previous routes
+    );
+  }
+
+  void _dismissKeyboard() {
+    FocusScope.of(context).unfocus();
+  }
+
+  Future<void> _refreshAssets() async {
+    await _fetchAssets();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _dismissKeyboard, // Dismiss keyboard when tapping outside
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text('Home'),
+          backgroundColor: Color(0xFF653D82), // KENET color theme
+          actions: [
+            IconButton(
+              icon: Icon(Icons.shopping_cart, size: 30), // Bigger cart icon
+              onPressed: () {
+                // Navigate to cart page
+              },
+            ),
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: _refreshAssets,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _navigateToDeliveries,
+                      child: Text('Consignments'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Color(0xFF653D82)),
+                        foregroundColor: Color(0xFF653D82),
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => DeliveryReceiving(title: '',), // Navigate to Add Consignments
+                          ),
+                        );
+                      },
+                      child: Text('Add Consignments'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Color(0xFF653D82)),
+                        foregroundColor: Color(0xFF653D82),
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: _navigateToLogin, // Logout action
+                      child: Text('Logout'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Color(0xFF653D82)),
+                        foregroundColor: Color(0xFF653D82),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search by Serial Number or KENET Tag...',
+                    prefixIcon: Icon(Icons.search),
+                    filled: true,
+                    fillColor: Colors.white,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(25),
+                      borderSide: BorderSide(color: Color(0xFF653D82), width: 2), // KENET color
+                    ),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _navigateToAssetCreation,
+                      child: Text('Add New Asset'),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Color(0xFF653D82)),
+                        foregroundColor: Color(0xFF653D82),
+                      ),
+                    ),
+                    SizedBox(width: 50), // Fixed space of 50 pixels
+                    IconButton(
+                      icon: Icon(Icons.fire_truck, size: 30), // Add your desired icon here
+                      color: Color(0xFF653D82), // Match your theme color
+                      onPressed: () {
+                        // Handle Add to Cart action
+                        // For example, navigate to the cart page or show a confirmation
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: _isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : _errorMessage.isNotEmpty
+                    ? Center(child: Text(_errorMessage))
+                    : ListView.builder(
+                  itemCount: _filteredAssets.length,
+                  itemBuilder: (context, index) {
+                    final asset = _filteredAssets[index];
+                    return ListTile(
+                      title: Text('Asset Name: ${asset['asset_description']}'),
+                      subtitle: Text(
+                        'Serial Number: ${asset['serial_number']} | KENET Tag: ${asset['kenet_tag']} | Location: ${asset['location']['name']}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      trailing: Text(
+                        'Status : ${asset['status']}',
+                        style: TextStyle(
+                          color: asset['status'] == 'Pending' ? Colors.red : Colors.green, // Change color based on status
+                        ),
+                      ),
+                      onTap: () => _showAssetOptionsDialog(context, asset),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showAssetOptionsDialog(BuildContext context, Map<String, dynamic> asset) {
+  showDialog(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        title: Text('Options for ${asset['asset_description']}'),
+        content: Text('Choose an option for this asset.'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              // Implement your release item logic here
+              Navigator.of(context).pop();
+            },
+            child: Text('Release Item'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Implement add to dispatch list logic here
+              // For example, add the item to the dispatch cart
+              Navigator.of(context).pop(); // Close the dialog
+            },
+            child: Text('Add to Dispatch List'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop(); // Just close the dialog
+            },
+            child: Text('Cancel'),
+          ),
+        ],
+      );
+    },
+  );
+}
