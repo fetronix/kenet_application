@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'assetreceiving.dart'; // Make sure to import the asset receiving screen
+import 'assetreceiving.dart'; // Import the asset receiving screen
+import 'cart.dart'; // Import the cart screen
 
 class HomeScreen extends StatefulWidget {
   final String id;
@@ -32,7 +33,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _assets = [];
   List<dynamic> _filteredAssets = [];
-  List<dynamic> _cart = [];
+  List<dynamic> _cart = []; // Cart to hold selected assets
   bool _isLoading = true;
   String _errorMessage = '';
   final TextEditingController _searchController = TextEditingController();
@@ -67,8 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       } else {
         setState(() {
-          _errorMessage =
-          'Failed to load assets. Status code: ${response.statusCode} - ${response.body}';
+          _errorMessage = 'Failed to load assets. Status code: ${response.statusCode} - ${response.body}';
           _isLoading = false;
         });
       }
@@ -91,29 +91,39 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Function to show a pop-up dialog for location update
   void _showLocationUpdateDialog(dynamic asset) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Update Location for ${asset['asset_description']}'),
-          content: TextField(
+          title: Text('Asset: ${asset['asset_description']}'),
+          content: asset['status'] == 'pending_release'
+              ? Text('This asset is pending release. Would you like to add it to the cart?')
+              : TextField(
             controller: _locationController,
             decoration: InputDecoration(labelText: 'Enter New Location'),
           ),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();
+                Navigator.of(context).pop(); // Close the dialog
               },
               child: Text('Cancel'),
             ),
-            ElevatedButton(
+            asset['status'] == 'pending_release'
+                ? ElevatedButton(
               onPressed: () {
-                _updateAssetLocation(asset);
+                _addToCart(asset['id']);
+                Navigator.of(context).pop(); // Close the dialog after action
               },
               child: Text('Add to Cart'),
+            )
+                : ElevatedButton(
+              onPressed: () {
+                _updateAssetLocation(asset);
+                Navigator.of(context).pop(); // Close the dialog after action
+              },
+              child: Text('Update Location'),
             ),
           ],
         );
@@ -121,53 +131,101 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Function to update the asset location and status
+
   Future<void> _updateAssetLocation(dynamic asset) async {
     final newLocation = _locationController.text.trim();
     if (newLocation.isEmpty) return;
 
-    final url = 'http://197.136.16.164:8000/app/assets/${asset['id']}/';
-
+    // Step 1: Update the asset location and status
+    final updateUrl = 'http://197.136.16.164:8000/app/assets/${asset['id']}/';
     try {
-      final response = await http.put(
-        Uri.parse(url),
+      final updateResponse = await http.put(
+        Uri.parse(updateUrl),
         headers: {
           'Authorization': 'Bearer ${widget.accessToken}',
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
           'status': 'pending_release',
-          'location': newLocation,
+          'new_location': newLocation,
         }),
       );
 
-      if (response.statusCode == 200) {
+      if (updateResponse.statusCode == 200) {
+        // Successfully updated location and status
         setState(() {
-          // Update the asset locally to reflect changes
-          asset['location']['name'] = newLocation;
+          asset['new_location'] = newLocation;
           asset['status'] = 'pending_release';
-
-          // Add to cart if not already added
-          if (!_cart.contains(asset)) {
-            _cart.add(asset);
-          }
-
           _locationController.clear();
         });
-        Navigator.of(context).pop(); // Close the dialog
+
+        // Show snackbar for successful update
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully updated asset location and status')),
+        );
       } else {
-        print('Failed to update asset: ${response.body}');
+        // Handle update failure
+        final errorResponse = jsonDecode(updateResponse.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update asset: ${errorResponse['error']}')),
+        );
       }
     } catch (e) {
       print('Error updating asset: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating asset: $e')),
+      );
     }
   }
 
-  // Navigate to Asset Receiving Screen
+
+  Future<void> _addToCart(int assetId) async {
+    final url = 'http://197.136.16.164:8000/app/cart/add/$assetId/';
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 201) {
+        // Successfully added to cart
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Successfully added asset to cart')),
+        );
+      } else {
+        // Handle errors
+        final errorResponse = jsonDecode(response.body);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to add to cart: ${errorResponse['error']}')),
+        );
+      }
+    } catch (e) {
+      // Handle network errors
+      print('Error adding to cart: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error adding to cart: $e')),
+      );
+    }
+  }
+
+
   void _navigateToAssetReceiving() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => AssetReceiving(title: 'fd',)),
+    );
+  }
+
+  // Function to navigate to the cart screen
+  void _navigateToCart() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CartScreen(accessToken:widget.accessToken),
+      ),
     );
   }
 
@@ -186,22 +244,20 @@ class _HomeScreenState extends State<HomeScreen> {
           backgroundColor: Color(0xFF653D82),
           actions: [
             IconButton(
-              iconSize: 30, // This is the size of the IconButton itself
+              iconSize: 30,
               icon: Container(
-                padding: EdgeInsets.all(8), // Optional padding for a larger touch target
+                padding: EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white, // Background color of the icon
+                  color: Colors.white,
                 ),
                 child: Icon(
                   Icons.shopping_cart,
-                  size: 30, // Size of the icon
-                  color: Colors.black, // Change to black or any color you prefer
+                  size: 30,
+                  color: Colors.black,
                 ),
               ),
-              onPressed: () {
-                // Navigate to cart page or show cart items
-              },
+              onPressed: _navigateToCart, // Navigate to the cart
             ),
           ],
         ),
@@ -241,25 +297,22 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-
                 ),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child:OutlinedButton.icon(
+                  child: OutlinedButton.icon(
                     onPressed: _navigateToAssetReceiving,
-                    icon: Icon(Icons.add, color: Color(0xFF653D82)), // Set icon color to match the button color
-                    label: Text('Add New Asset', style: TextStyle(color: Color(0xFF653D82))), // Set text color to match
+                    icon: Icon(Icons.add, color: Color(0xFF653D82)),
+                    label: Text('Add New Asset', style: TextStyle(color: Color(0xFF653D82))),
                     style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white, // Background color (optional, can be transparent)
-                      side: BorderSide(color: Color(0xFF653D82), width: 2), // Outline color and width
-                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16), // Added horizontal padding
+                      backgroundColor: Colors.white,
+                      side: BorderSide(color: Color(0xFF653D82), width: 2),
+                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25), // Rounded borders
+                        borderRadius: BorderRadius.circular(25),
                       ),
                     ),
                   ),
-
-
                 ),
                 Expanded(
                   child: _isLoading
@@ -271,30 +324,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemBuilder: (context, index) {
                       final asset = _filteredAssets[index];
                       return Card(
-                        margin: EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
+                        margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         child: ListTile(
-                          title: Text(
-                            'Asset: ${asset['asset_description']}',
-                            style: TextStyle(color: Colors.black),
+                          title: Text(asset['asset_description']),
+                          subtitle: Text('Serial Number: ${asset['serial_number']}|Location Received : ${asset['location']['name']}|Location Going : ${asset['new_location']}'),
+                          trailing: IconButton(
+                            icon: Icon(Icons.edit),
+                            onPressed: () => _showLocationUpdateDialog(asset),
                           ),
-                          subtitle: Text(
-                            'Serial: ${asset['serial_number']} | Tag: ${asset['kenet_tag']} | Location: ${asset['location']['name']}',
-                            style: TextStyle(color: Colors.black),
-                          ),
-                          trailing: Text(
-                            'Status: ${asset['status']}',
-                            style: TextStyle(
-                              color: asset['status'] ==
-                                  'pending_release'
-                                  ? Colors.red
-                                  : Colors.green,
-                            ),
-                          ),
-                          onTap: () {
-                            // Show the location update pop-up when item is clicked
-                            _showLocationUpdateDialog(asset);
-                          },
                         ),
                       );
                     },
