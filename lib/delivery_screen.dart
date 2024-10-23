@@ -1,49 +1,41 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:kenet_application/Consignmentreceiving.dart';
-import 'package:kenet_application/addDelivery.dart';
-import 'package:kenet_application/assetreceiving.dart';// Import the Deliveries page
-import 'dart:convert';
+import 'package:kenet_application/addDelivery.dart'; // Import your add delivery screen
+import 'package:url_launcher/url_launcher.dart'; // Import for launching URLs
 
-class HomeScreen extends StatefulWidget {
-  final String id;
-  final String username;
-  final String firstName;
-  final String lastName;
-  final String email;
-  final String role;
+class DeliveriesScreen extends StatefulWidget {
   final String accessToken;
-  final String refreshToken;
 
-  const HomeScreen({
-    Key? key,
-    required this.id,
-    required this.username,
-    required this.firstName,
-    required this.lastName,
-    required this.email,
-    required this.role,
-    required this.accessToken,
-    required this.refreshToken,
-  }) : super(key: key);
+  const DeliveriesScreen({Key? key, required this.accessToken}) : super(key: key);
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _DeliveriesScreenState createState() => _DeliveriesScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  List<dynamic> _assets = [];
+class _DeliveriesScreenState extends State<DeliveriesScreen> {
+  List<dynamic> _deliveries = [];
+  List<dynamic> _filteredDeliveries = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _fetchAssets();
+    _fetchDeliveries();
+    _searchController.addListener(_filterDeliveries);
   }
 
-  Future<void> _fetchAssets() async {
-    final url = 'http://197.136.16.164:8000/app/api/assets/'; // Update with your actual API endpoint
+  @override
+  void dispose() {
+    _searchController.removeListener(_filterDeliveries);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchDeliveries() async {
+    final url = 'http://197.136.16.164:8000/app/api/delivery/'; // Update with your actual API endpoint for deliveries
 
     try {
       final response = await http.get(
@@ -55,12 +47,15 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
         setState(() {
-          _assets = jsonDecode(response.body);
+          _deliveries = data; // Assuming the root is the list of deliveries
+          _filteredDeliveries = _deliveries; // Initialize filtered deliveries
         });
+        print('Deliveries fetched: ${_deliveries.length}'); // Debugging line
       } else {
         setState(() {
-          _errorMessage = 'Failed to load assets. Status code: ${response.statusCode}';
+          _errorMessage = 'Failed to load deliveries. Status code: ${response.statusCode}';
         });
       }
     } catch (e) {
@@ -74,17 +69,21 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _navigateToAssetCreation() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => AssetReceiving(title: "Asset Receiving")), // Ensure you have this screen implemented
-    );
+  void _filterDeliveries() {
+    String query = _searchController.text.toLowerCase();
+
+    setState(() {
+      _filteredDeliveries = _deliveries.where((delivery) {
+        return delivery['supplier_name']?.toLowerCase().contains(query) ?? false;
+      }).toList();
+      print('Filtered deliveries: ${_filteredDeliveries.length}'); // Debugging line
+    });
   }
 
-  void _navigateToDeliveries() {
+  void _navigateToAddDelivery() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (context) => DeliveryReceiving(title: "Consignment")), // Navigate to the Deliveries page
+      MaterialPageRoute(builder: (context) => DeliveryReceiving(title: '')), // Navigate to the AddDeliveryScreen
     );
   }
 
@@ -92,38 +91,97 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Home'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.add),
-            onPressed: _navigateToAssetCreation, // Navigate to the asset creation screen
-          ),
-          IconButton(
-            icon: Icon(Icons.local_shipping), // Add an icon for deliveries
-            onPressed: _navigateToDeliveries, // Navigate to the deliveries screen
-          ),
-        ],
+        title: Text('Deliveries'),
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _errorMessage.isNotEmpty
-          ? Center(child: Text(_errorMessage))
-          : ListView.builder(
-        itemCount: _assets.length,
-        itemBuilder: (context, index) {
-          final asset = _assets[index];
-          return ListTile(
-            title: Text(asset['asset_description'] ?? 'No description'),
-            subtitle: Text('Serial Number: ${asset['serial_number'] ?? 'N/A'}'),
-            trailing: IconButton(
-              icon: Icon(Icons.edit),
-              onPressed: () {
-                // Handle edit action here (you might want to navigate to an edit screen)
-              },
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search by Supplier Name...',
+                prefixIcon: Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(25),
+                  borderSide: BorderSide(color: Colors.grey),
+                ),
+              ),
             ),
-          );
-        },
+            SizedBox(height: 16),
+            OutlinedButton(
+              onPressed: _navigateToAddDelivery,
+              child: Text('Add Delivery'),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: Color(0xFF653D82)), // Change to your desired border color
+                foregroundColor: Color(0xFF653D82), // Change to your desired text color
+              ),
+            ),
+            SizedBox(height: 16),
+            Expanded(
+              child: _isLoading
+                  ? Center(child: CircularProgressIndicator())
+                  : _errorMessage.isNotEmpty
+                  ? Center(child: Text(_errorMessage))
+                  : ListView.builder(
+                itemCount: _filteredDeliveries.length,
+                itemBuilder: (context, index) {
+                  final delivery = _filteredDeliveries[index];
+
+                  // Debugging statement to check delivery data
+                  print('Delivery item at index $index: $delivery');
+
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 8.0),
+                    child: ListTile(
+                      title: Text(delivery['supplier_name'] ?? 'No description'),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Quantity: ${delivery['quantity'].toString()} | Person Received: ${delivery['person_receiving'] ?? 'N/A'} | Invoice Number: ${delivery['invoice_number'] ?? 'N/A'}',
+                          ),
+                          delivery['invoice_file'] != null
+                              ? GestureDetector(
+                            onTap: () {
+                              _launchURL(delivery['invoice_file']);
+                            },
+                            child: Text(
+                              'View Invoice',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          )
+                              : Text('No Invoice Available'),
+                        ],
+                      ),
+                      trailing: IconButton(
+                        icon: Icon(Icons.edit),
+                        onPressed: () {
+                          // Handle edit action here (e.g., navigate to edit screen)
+                        },
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
+  }
+
+  // Function to launch a URL for the invoice file
+  Future<void> _launchURL(String url) async {
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
   }
 }

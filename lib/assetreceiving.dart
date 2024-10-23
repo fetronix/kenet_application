@@ -112,6 +112,240 @@ class _AssetReceivingState extends State<AssetReceiving> {
     }
   }
 
+  void _physicalScan() {
+
+    // Step 1: Ask the user for the number of items to scan
+    showDialog<int>(
+      context: context,
+      builder: (BuildContext context) {
+        int itemCount = 1; // Default to 1 item
+        return AlertDialog(
+          title: Text("Number of Items to Scan"),
+          content: TextField(
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(hintText: "Enter number of items"),
+            onChanged: (value) {
+              itemCount = int.tryParse(value) ?? 1; // Parse to int, default to 1 if invalid
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, itemCount); // Pass the item count back
+              },
+              child: Text("Next"),
+            ),
+          ],
+        );
+      },
+    ).then((value) {
+      if (value != null && value > 0) {
+        // Step 2: Start the scanning process
+        _scanItems(value);
+      }
+    });
+  }
+
+  void _scanItems(int itemCount) {
+    final List<Map<String, String>> scannedItems = [];
+
+    // Assuming _assetDescription is already set from the input form
+    String assetDescription = _assetDescription; // Get from the form, no additional input needed
+
+    Future<void> _scanItem(int index) async {
+      String? serialNumber = await _scanInput("Enter Serial Number for Item ${index + 1}");
+      if (serialNumber == null) {
+        _showSummary(scannedItems); // Show summary if canceled
+        return; // Exit the scanning loop
+      }
+
+      String? kenetTagNumber = await _scanInput("Enter KENET Tag Number for Item ${index + 1}");
+      if (kenetTagNumber == null) {
+        _showSummary(scannedItems); // Show summary if canceled
+        return; // Exit the scanning loop
+      }
+
+      // Retrieve the person receiving ID from shared preferences
+      SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
+      String? personReceivingId = await sharedPrefHelper.getUserId();
+
+      String selectedCategory = _selectedCategory != null ? _selectedCategory!['name'] : "Not Selected";
+      String selectedStatus = _selectedStatus ?? "Not Selected";
+      String location = _location != null ? _location!['name'] : "Not Selected";
+      String date = DateTime.now().toIso8601String();
+
+      scannedItems.add({
+        "serial": serialNumber,
+        "kenetTag": kenetTagNumber,
+        "personReceiving": personReceivingId ?? "Not Found", // Handle case if user ID is not found
+        "assetDescription": assetDescription,
+        "category": selectedCategory,
+        "status": selectedStatus,
+        "location": location,
+        "date": date,
+      });
+
+      if (index + 1 < itemCount) {
+        _scanItem(index + 1); // Scan next item
+      } else {
+        _showSummary(scannedItems);
+      }
+    }
+
+    _scanItem(0);
+  }
+
+  Future<String?> _scanInput(String title) async {
+    String? inputValue; // Change to nullable String
+    final TextEditingController controller = TextEditingController();
+    final FocusNode focusNode = FocusNode();
+
+    // Display a dialog to capture the input
+    await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          content: TextField(
+            controller: controller,
+            focusNode: focusNode, // Set the focus node to the text field
+            autofocus: true, // Focus on this input field
+            decoration: InputDecoration(hintText: "Enter value"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                inputValue = controller.text; // Get the input value
+                Navigator.pop(context); // Close the dialog
+              },
+              child: Text("Submit"),
+            ),
+            TextButton(
+              onPressed: () {
+                controller.clear(); // Clear the text field
+                focusNode.requestFocus(); // Set focus back to the text field
+              },
+              child: Text("Clear"),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context, null); // Return null to indicate cancellation
+              },
+              child: Text("Cancel"),
+            ),
+          ],
+        );
+      },
+    );
+
+    return inputValue; // Return the captured value or null
+  }
+
+
+
+
+  void _showSummary(List<Map<String, String>> scannedItems) {
+    List<Widget> summaryItems = [];
+    Set<String> uniqueIdentifiers = Set(); // To track unique identifiers
+    List<Map<String, String>> uniqueItems = []; // For storing unique items
+    List<Map<String, String>> duplicateItems = []; // For storing duplicate items
+
+    // Build the summary details for each scanned item
+    for (var item in scannedItems) {
+      // Create a unique identifier for each item (combining serial and kenet tag)
+      String identifier = "${item['serial']}-${item['kenetTag']}";
+
+      if (!uniqueIdentifiers.contains(identifier)) {
+        uniqueIdentifiers.add(identifier);
+        uniqueItems.add(item); // Save unique item
+      } else {
+        duplicateItems.add(item); // Save duplicate item
+      }
+
+      summaryItems.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0), // Add some spacing between items
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text("Serial: ${item['serial']}"),
+              Text("KENET Tag: ${item['kenetTag']}"),
+              Text("Person Receiving: ${item['personReceiving']}"),
+              Text("Asset Description: ${item['assetDescription']}"),
+              Text("Category: ${item['category']}"),
+              Text("Status: ${item['status']}"),
+              Text("Location: ${item['location']}"),
+              Text("Date: ${item['date']}"),
+              Divider(), // Optional divider between items for clarity
+            ],
+          ),
+        ),
+      );
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text("Scanned Items Summary"),
+          content: Container(
+            width: double.maxFinite, // Make the dialog width responsive
+            child: SingleChildScrollView(
+              child: Column(
+                children: summaryItems,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                // Loop through unique items and save each to the database
+                for (var item in uniqueItems) {
+                  final asset = {
+                    'date_received': DateTime.now().toIso8601String(),
+                    'person_receiving': item['personReceiving'], // Current user ID
+                    'asset_description': item['assetDescription'],
+                    'serial_number': item['serial'],
+                    'kenet_tag': item['kenetTag'],
+                    'location': _location?['id'],
+                    'category': _selectedCategory?['id'],
+                    'status': _selectedStatus,
+                  };
+
+                  // Call the method to save the asset
+                  await _saveAsset(asset);
+                }
+
+                // Show a SnackBar if there were duplicates
+                if (duplicateItems.isNotEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Duplicates found! Only one instance of identical items has been saved."),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
+
+                // Close the dialog after saving
+                Navigator.of(context).pop(true);
+              },
+              child: const Text('Save All Assets'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context), // Close dialog
+              child: Text("Cancel"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+
+
+
   Future<void> _scanItem() async {
     if (_assetDescription.isEmpty ||
         _selectedCategory == null ||
@@ -404,22 +638,21 @@ class _AssetReceivingState extends State<AssetReceiving> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          OutlinedButton(
-                            onPressed: _scanItem,
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: const Color(0xFF653D82)), // Set the outline color
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Increased value for more rounded edges
+                          // Buttons for scanning
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: _physicalScan, // Method to handle physical barcode scan
+                                icon: Icon(Icons.qr_code_scanner),
+                                label: const Text("Physical Scanner"),
                               ),
-                            ),
-                            child: const Text(
-                              'Scan Asset',
-                              style: TextStyle(
-                                color: Color(0xFF653D82), // Set the text color to match the outline
-                                fontWeight: FontWeight.bold, // Set the font weight to bold
-                                fontSize: 18, // Set the font size to 18
+                              ElevatedButton.icon(
+                                onPressed: _scanItem, // Method to handle camera scan
+                                icon: Icon(Icons.camera_alt),
+                                label: const Text("Camera Scan"),
                               ),
-                            ),
+                            ],
                           ),
 
                         ],
@@ -435,3 +668,4 @@ class _AssetReceivingState extends State<AssetReceiving> {
     );
   }
 }
+

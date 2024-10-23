@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'shared_pref_helper.dart'; // Adjust the import based on your file structure
+import 'package:http_parser/http_parser.dart'; // Import for MediaType
+import 'package:image_picker/image_picker.dart';
+import 'shared_pref_helper.dart';
 
 class DeliveryReceiving extends StatefulWidget {
   const DeliveryReceiving({Key? key, required String title}) : super(key: key);
@@ -12,20 +14,19 @@ class DeliveryReceiving extends StatefulWidget {
 }
 
 class _DeliveryReceivingState extends State<DeliveryReceiving> {
-  final List<Map<String, dynamic>> _scannedAssets = [];
-  String _assetDescription = '';
   String _supplierNameController = '';
   String _quantityController = '';
   String _invoiceNumberController = '';
   String _projectController = '';
-  String _commentsController ='' ;
-  String? _invoiceFilePath;
-  String _personReceiving = ''; // Field for person receiving the asset (will get logged-in user)
+  String _commentsController = '';
+  String _personReceiving = ''; // For person receiving the asset
   String? _userId;
 
+  File? _selectedFile;
+  String _fileType = ''; // To indicate whether it's an image or a document
 
-  final String apiUrl = 'http://197.136.16.164:8000/app/deliveries/';
-
+  final String apiUrl = 'http://197.136.16.164:8000/app/delivery/new/';
+  final ImagePicker _imagePicker = ImagePicker();
 
   @override
   void initState() {
@@ -33,59 +34,81 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
     _getLoggedInUser();
   }
 
-  // Method to get the current logged-in user ID
   Future<void> _getLoggedInUser() async {
     SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
-    String? userId = await sharedPrefHelper.getUserId(); // Assuming getUserId() gets the logged-in user ID
+    String? userId = await sharedPrefHelper.getUserId(); // Get the logged-in user ID
     setState(() {
-      _personReceiving = userId ?? ''; // Set the person receiving to the logged-in user
-      _userId = userId; // Store userId for display in the dialog
+      _personReceiving = userId ?? '';
+      _userId = userId;
     });
   }
-  void _pickFile() async {
-    FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['pdf'], // Allow only PDF files
-    );
 
-    if (result != null) {
+  Future<void> _pickImage(ImageSource source) async {
+    final pickedImage = await _imagePicker.pickImage(source: source);
+    if (pickedImage != null) {
       setState(() {
-        _invoiceFilePath = result.files.single.path;
+        _selectedFile = File(pickedImage.path);
+        _fileType = 'image';
       });
     }
   }
 
+  Future<void> _pickFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx'], // Allow only certain file types
+    );
+    if (result != null) {
+      setState(() {
+        _selectedFile = File(result.files.single.path!);
+        _fileType = 'document';
+      });
+    }
+  }
 
-
-  Future<void> _saveAsset(Map<String, dynamic> asset) async {
+  Future<void> _saveAsset(Map<String, dynamic> asset, File? file) async {
     SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
     String? accessToken = await sharedPrefHelper.getAccessToken(); // Retrieve access token
 
-    final response = await http.post(
-      Uri.parse(apiUrl),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $accessToken', // Add authorization header
-      },
-      body: jsonEncode(asset),
-    );
+    var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
+    request.headers['Authorization'] = 'Bearer $accessToken';
 
+    // Convert all fields to string for request
+    request.fields.addAll({
+      'date_delivered': asset['date_delivered'].toString(),
+      'person_receiving': asset['person_receiving'].toString(),
+      'supplier_name': asset['supplier_name'].toString(),
+      'quantity': asset['quantity'].toString(),
+      'invoice_number': asset['invoice_number'].toString(),
+      'project': asset['project'].toString(),
+      'comments': asset['comments'].toString(),
+    });
+
+    if (file != null) {
+      request.files.add(await http.MultipartFile.fromPath(
+        'invoice_file',
+        file.path,
+        contentType: _fileType == 'image'
+            ? MediaType('image', 'jpeg')
+            : MediaType('application', 'pdf'),
+      ));
+    }
+
+    var response = await request.send();
     if (response.statusCode == 201) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Asset added successfully!')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add asset: ${response.body}')),
+        SnackBar(content: Text('Failed to add asset. Error code: ${response.statusCode}')),
       );
     }
   }
 
-
-
   Future<bool> _showConfirmationDialog() async {
     SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
-    String? personReceivingId = await sharedPrefHelper.getUserId(); // Assuming you have a method to get user ID
+    String? personReceivingId = await sharedPrefHelper.getUserId(); // Get user ID
 
     return await showDialog<bool>(
       context: context,
@@ -96,26 +119,27 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('Person Receiving: $personReceivingId'),
-              Text('Asset Description: $_assetDescription'),
               Text('Supplier Name: $_supplierNameController'),
               Text('Quantity: $_quantityController'),
               Text('Invoice Number: $_invoiceNumberController'),
               Text('Project: $_projectController'),
               Text('Comments: $_commentsController'),
-              Text('Person Receiving: $_userId'),
-              Text('Invoice File: $_invoiceFilePath'),
-
+              Text('File: ${_selectedFile?.path ?? "No file selected"}'),
             ],
           ),
           actions: [
             TextButton(
               onPressed: () {
                 final asset = {
-                  'date_received': DateTime.now().toIso8601String(),
-                  'person_receiving': personReceivingId, // Set to current user ID
-                  'asset_description': _assetDescription,
+                  'date_delivered': DateTime.now().toIso8601String(),
+                  'person_receiving': personReceivingId,
+                  'supplier_name': _supplierNameController,
+                  'quantity': _quantityController,
+                  'invoice_number': _invoiceNumberController,
+                  'project': _projectController,
+                  'comments': _commentsController,
                 };
-                _saveAsset(asset);
+                _saveAsset(asset, _selectedFile);
                 Navigator.of(context).pop(true);
               },
               child: const Text('Confirm'),
@@ -127,21 +151,22 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
           ],
         );
       },
-    ) ?? false;
+    ) ??
+        false;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Asset Receiving'),
+        title: const Text('Delivery Receiving'),
       ),
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Container(
-              width: 400, // Set the width of the form here
+              width: 400,
               child: Column(
                 children: [
                   Card(
@@ -150,7 +175,6 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                       padding: const EdgeInsets.all(16.0),
                       child: Column(
                         children: [
-
                           const SizedBox(height: 16),
                           TextField(
                             onChanged: (value) {
@@ -161,7 +185,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                             decoration: InputDecoration(
                               labelText: 'Supplier Name',
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Rounded border
+                                borderRadius: BorderRadius.circular(30.0),
                               ),
                             ),
                           ),
@@ -175,7 +199,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                             decoration: InputDecoration(
                               labelText: 'Quantity',
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Rounded border
+                                borderRadius: BorderRadius.circular(30.0),
                               ),
                             ),
                           ),
@@ -189,7 +213,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                             decoration: InputDecoration(
                               labelText: 'Invoice Number',
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Rounded border
+                                borderRadius: BorderRadius.circular(30.0),
                               ),
                             ),
                           ),
@@ -200,11 +224,10 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                                 _projectController = value;
                               });
                             },
-
                             decoration: InputDecoration(
                               labelText: 'Project',
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Rounded border
+                                borderRadius: BorderRadius.circular(30.0),
                               ),
                             ),
                           ),
@@ -218,34 +241,36 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                             decoration: InputDecoration(
                               labelText: 'Comments',
                               border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Rounded border
+                                borderRadius: BorderRadius.circular(30.0),
                               ),
                             ),
                           ),
                           const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () => _pickImage(ImageSource.camera),
+                                icon: const Icon(Icons.camera),
+                                label: const Text('Take Picture'),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: _pickFile,
+                                icon: const Icon(Icons.attach_file),
+                                label: const Text('Select Invoice File'),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
                           ElevatedButton(
-                            onPressed: _pickFile, // Pick the file when this button is clicked
-                            child: Text(_invoiceFilePath == null ? 'Select Invoice File' : 'Invoice Selected'),
-                          ),
-                          const SizedBox(height: 20),
-                          OutlinedButton(
                             onPressed: _showConfirmationDialog,
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: const Color(0xFF653D82)), // Set the outline color
+                            style: ElevatedButton.styleFrom(
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Increased value for more rounded edges
+                                borderRadius: BorderRadius.circular(30.0),
                               ),
                             ),
-                            child: const Text(
-                              'Save Asset',
-                              style: TextStyle(
-                                color: Color(0xFF653D82), // Set the text color to match the outline
-                                fontWeight: FontWeight.bold, // Set the font weight to bold
-                                fontSize: 18, // Set the font size to 18
-                              ),
-                            ),
+                            child: const Text('Submit'),
                           ),
-
                         ],
                       ),
                     ),
