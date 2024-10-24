@@ -7,10 +7,10 @@ import 'package:intl/intl.dart';
 
 class ReleaseForm extends StatelessWidget {
 
-  final Map<String, dynamic> asset; // Declare the asset field
+  // final Map<String, dynamic> asset; // Declare the asset field
 
   // Constructor to accept the asset parameter
-  ReleaseForm({Key? key, required this.asset}) : super(key: key);
+  // ReleaseForm({Key? key, required this.asset}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,8 @@ class ReleaseForm extends StatelessWidget {
         ),
         body: SingleChildScrollView(
           padding: EdgeInsets.all(16),
-          child: FormLayout(asset:asset),
+          // child: FormLayout(asset:asset),
+          child: FormLayout(asset: {},),
         ),
       ),
     );

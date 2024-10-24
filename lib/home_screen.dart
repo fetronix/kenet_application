@@ -1,5 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:kenet_application/addDelivery.dart';
+import 'package:kenet_application/delivery_screen.dart';
+import 'package:kenet_application/release_form.dart';
+import 'package:kenet_application/settings.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'assetreceiving.dart'; // Import the asset receiving screen
 import 'cart.dart'; // Import the cart screen
@@ -131,6 +136,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Logout function
+  void _logoutUser() async {
+    // Clear user session or token
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('userToken'); // Adjust the key as necessary
+    // Any other necessary cleanup can be done here
+  }
 
   Future<void> _updateAssetLocation(dynamic asset) async {
     final newLocation = _locationController.text.trim();
@@ -230,6 +242,112 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showMenuDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Column(
+            children: [
+              Image.asset(
+                'assets/images/logo.png', // Replace with your logo asset path
+                height: 100, // Adjust the height as needed
+              ),
+              Divider(), // Divider below the logo
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildMenuButton('Add Assets', Icons.add_circle, () {
+                // Navigate to add assets page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => AssetReceiving(title: 'fd',)),
+                );
+              }),
+              SizedBox(height: 10), // Add spacing between buttons
+              _buildMenuButton('Cart', Icons.shopping_cart, () {
+                // Handle Cart tap
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => CartScreen(accessToken:widget.accessToken)),
+                );
+              }),
+              SizedBox(height: 10), // Add spacing between buttons
+              _buildMenuButton('Add Consignment', Icons.assignment_add, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => DeliveryReceiving(title:'')),
+                );
+              }),
+              SizedBox(height: 10),
+              _buildMenuButton('View Consignment', Icons.view_agenda, () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => DeliveriesScreen(accessToken:widget.accessToken)),
+                );
+              }),
+              SizedBox(height: 10), // Add spacing between buttons
+              _buildMenuButton('Release Form', Icons.book, () {
+                // Handle Settings tap
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => ReleaseForm()),
+                );
+              }),
+              SizedBox(height: 10), // Add spacing between buttons
+              _buildMenuButton('Logout', Icons.logout, () {
+                _logoutUser(); // Call your logout function
+                Navigator.of(context).pushReplacementNamed('/login');
+              }),
+            ],
+          ),
+          actions: [
+            TextButton(
+              child: Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+// Method to build a rounded button with an icon
+  Widget _buildMenuButton(String title, IconData icon, VoidCallback onTap) {
+    return SizedBox(
+      width: double.infinity, // Ensures the button takes full width
+      child: ElevatedButton(
+        style: ElevatedButton.styleFrom(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30), // Rounded corners
+          ), backgroundColor: Colors.white,
+          side: BorderSide(
+            color: Color(0xFF653D82),
+            width: 2, // Increase border width
+          ), // Background color
+          padding: EdgeInsets.symmetric(vertical: 12), // Button padding
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center, // Center align the content
+          children: [
+            Icon(icon, color: Color(0xFF653D82)), // Icon color
+            SizedBox(width: 8), // Space between icon and text
+            Text(
+              title,
+              style: TextStyle(color: Color(0xFF653D82)), // Text color
+            ),
+          ],
+        ),
+        onPressed: onTap,
+      ),
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -257,8 +375,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   size: 30,
                   color: Colors.black,
                 ),
+
               ),
               onPressed: _navigateToCart, // Navigate to the cart
+            ),
+            IconButton(
+              iconSize: 40, // Increase the size of the icon
+              icon: Container(
+                padding: EdgeInsets.all(8), // Add padding for a better touch target
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.transparent, // Keep background transparent
+                ),
+                child: Icon(
+                  Icons.menu,
+                  size: 30, // You can also adjust this size if needed
+                  color: Colors.white, // Set the icon color to white
+                ),
+              ),
+              onPressed: _showMenuDialog, // Show the menu dialog
             ),
           ],
         ),

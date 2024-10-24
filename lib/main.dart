@@ -15,6 +15,11 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
       ),
       home: LoginScreen(),
+      routes: {
+        '/login': (context) => LoginScreen(), // Adjust the widget name as necessary
+        // '/add-assets': (context) => AddAssetsPage(), // Replace with your add assets page widget
+      },
     );
+
   }
 }
