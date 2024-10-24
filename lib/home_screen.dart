@@ -193,20 +193,21 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 201) {
         // Successfully added to cart
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully added asset to cart')),
+          SnackBar(content: Text('Successfully added asset to dispatch basket')),
         );
       } else {
         // Handle errors
         final errorResponse = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add to cart: ${errorResponse['error']}')),
+          SnackBar(content: Text('The Asset is Already in dispatch basket')),
         );
       }
     } catch (e) {
       // Handle network errors
       print('Error adding to cart: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding to cart: $e')),
+        // SnackBar(content: Text('Error adding to cart: $e')),
+        SnackBar(content: Text('The Asset is Already in dispatch basket')),
       );
     }
   }
