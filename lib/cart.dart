@@ -77,7 +77,7 @@ class _CartScreenState extends State<CartScreen> {
   void _calculateInitialCountdown() {
     if (cartItems.isNotEmpty) {
       // Assuming the countdown duration is 50 seconds (adjust as necessary)
-      final duration = 50; // seconds
+      final duration = 3600; // seconds
 
       // Calculate remaining time for each item based on added_at
       final now = DateTime.now();
@@ -97,7 +97,39 @@ class _CartScreenState extends State<CartScreen> {
       }
     }
   }
+// Function to handle checkout process
+  Future<void> _checkoutCartItems() async {
+    final url = 'http://197.136.16.164:8000/app/cart/checkout/'; // Endpoint for checkout
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'cart_items': cartItems.map((item) => item['id']).toList()}),
+      );
 
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Checkout successful')),
+        );
+        // Optionally clear cart items after checkout
+        setState(() {
+          cartItems.clear();
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Checkout failed: ${response.body}')),
+        );
+      }
+    } catch (e) {
+      print('Error during checkout: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error during checkout: $e')),
+      );
+    }
+  }
   // Countdown method
   void _startCountdown() {
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
@@ -256,6 +288,13 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                 );
               },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ElevatedButton(
+              onPressed: _checkoutCartItems, // Trigger checkout function
+              child: Text('Checkout'),
             ),
           ),
         ],

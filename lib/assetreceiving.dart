@@ -14,10 +14,13 @@ class AssetReceiving extends StatefulWidget {
 class _AssetReceivingState extends State<AssetReceiving> {
   final List<Map<String, dynamic>> _scannedAssets = [];
   String _assetDescription = '';
+  String _assetDescriptionModel = '';
   String? _selectedStatus;
   Map<String, dynamic>? _selectedCategory;
+  Map<String, dynamic>? _selectedDelivery;
   Map<String, dynamic>? _location;
   List<Map<String, dynamic>> _categories = [];
+  List<Map<String, dynamic>> _deliveries = [];
   List<Map<String, dynamic>> _locations = [];
   List<String> _statuses = [
     'instore',
@@ -33,6 +36,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
   final String apiUrl = 'http://197.136.16.164:8000/app/assets/';
   final String categoryApiUrl =
       'http://197.136.16.164:8000/app/api/categories/';
+
+  final String deliveryApiUrl =
+      'http://197.136.16.164:8000/app/api/mydeliveries/';
   final String locationApiUrl =
       'http://197.136.16.164:8000/app/api/locations/';
 
@@ -40,6 +46,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
   void initState() {
     super.initState();
     _fetchCategories();
+    _fetchDeliveries();
     _fetchLocations();
     _filteredLocations = _locations;
   }
@@ -57,6 +64,23 @@ class _AssetReceivingState extends State<AssetReceiving> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Failed to load categories: ${response.body}')),
+      );
+    }
+  }
+
+  Future<void> _fetchDeliveries() async {
+    final response = await http.get(Uri.parse(deliveryApiUrl));
+    if (response.statusCode == 200) {
+      List<dynamic> deliveryList = jsonDecode(response.body);
+      setState(() {
+        _deliveries = deliveryList.map((delivery) => {
+          'id': delivery['id'],
+          'delivery_id': delivery['delivery_id'],
+        }).toList();
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load deliveries: ${response.body}')),
       );
     }
   }
@@ -151,6 +175,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
 
     // Assuming _assetDescription is already set from the input form
     String assetDescription = _assetDescription; // Get from the form, no additional input needed
+    String assetDescriptionModel = _assetDescriptionModel; // Get from the form, no additional input needed
 
     Future<void> _scanItem(int index) async {
       String? serialNumber = await _scanInput("Enter Serial Number for Item ${index + 1}");
@@ -170,6 +195,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
       String? personReceivingId = await sharedPrefHelper.getUserId();
 
       String selectedCategory = _selectedCategory != null ? _selectedCategory!['name'] : "Not Selected";
+      String selectedDelivery = _selectedDelivery != null ? _selectedDelivery!['delivery_id'] : "Not Selected";
       String selectedStatus = _selectedStatus ?? "Not Selected";
       String location = _location != null ? _location!['name'] : "Not Selected";
       String date = DateTime.now().toIso8601String();
@@ -179,7 +205,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
         "kenetTag": kenetTagNumber,
         "personReceiving": personReceivingId ?? "Not Found", // Handle case if user ID is not found
         "assetDescription": assetDescription,
+        "assetDescriptionModel": assetDescriptionModel,
         "category": selectedCategory,
+        "delivery": selectedDelivery,
         "status": selectedStatus,
         "location": location,
         "date": date,
@@ -272,7 +300,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
               Text("KENET Tag: ${item['kenetTag']}"),
               Text("Person Receiving: ${item['personReceiving']}"),
               Text("Asset Description: ${item['assetDescription']}"),
+              Text("Asset Description Model: ${item['assetDescriptionModel']}"),
               Text("Category: ${item['category']}"),
+              Text("Delivery: ${item['delivery']}"),
               Text("Status: ${item['status']}"),
               Text("Location: ${item['location']}"),
               Text("Date: ${item['date']}"),
@@ -305,10 +335,12 @@ class _AssetReceivingState extends State<AssetReceiving> {
                     'date_received': DateTime.now().toIso8601String(),
                     'person_receiving': item['personReceiving'], // Current user ID
                     'asset_description': item['assetDescription'],
+                    'asset_description_model': item['assetDescriptionModel'],
                     'serial_number': item['serial'],
                     'kenet_tag': item['kenetTag'],
                     'location': _location?['id'],
                     'category': _selectedCategory?['id'],
+                    'delivery': _selectedDelivery?['id'],
                     'status': _selectedStatus,
                   };
 
@@ -348,7 +380,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
 
   Future<void> _scanItem() async {
     if (_assetDescription.isEmpty ||
+        _assetDescriptionModel.isEmpty ||
         _selectedCategory == null ||
+        _selectedDelivery == null ||
         _selectedStatus == null ||
         _location == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -475,7 +509,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
               Text('KENET Tag: $kenetTag'),
               Text('Person Receiving: $personReceivingId'),
               Text('Asset Description: $_assetDescription'),
+              Text('Asset Description Model: $_assetDescriptionModel'),
               Text('Category: ${_selectedCategory != null ? _selectedCategory!['name'] : "Not Selected"}'),
+              Text('Delivery: ${_selectedDelivery != null ? _selectedDelivery!['delivery_id'] : "Not Selected"}'),
               Text('Status: ${_selectedStatus ?? "Not Selected"}'),
               Text('Location: ${_location != null ? _location!['name'] : "Not Selected"}'),
               Text('Date: ${DateTime.now().toIso8601String()}'),
@@ -488,10 +524,12 @@ class _AssetReceivingState extends State<AssetReceiving> {
                   'date_received': DateTime.now().toIso8601String(),
                   'person_receiving': personReceivingId, // Set to current user ID
                   'asset_description': _assetDescription,
+                  'asset_description_model': _assetDescriptionModel,
                   'serial_number': serialNumber,
                   'kenet_tag': kenetTag,
                   'location': _location?['id'],
                   'category': _selectedCategory?['id'],
+                  'delivery': _selectedDelivery?['id'],
                   'status': _selectedStatus,
                 };
                 _saveAsset(asset);
@@ -540,6 +578,46 @@ class _AssetReceivingState extends State<AssetReceiving> {
                               labelText: 'Asset Description',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(30.0), // Rounded border
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            onChanged: (value) {
+                              setState(() {
+                                _assetDescription = value;
+                              });
+                            },
+                            decoration: InputDecoration(
+                              labelText: 'Asset Description Model',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(30.0), // Rounded border
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30.0), // Adjust the radius as needed
+                              border: Border.all(color: Colors.grey), // Set border color and width
+                            ),
+                            child: DropdownButtonFormField<Map<String, dynamic>>(
+                              hint: const Text('Select Consignment to Asset'),
+                              value: _selectedDelivery,
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedDelivery = value;
+                                });
+                              },
+                              items: _deliveries.map((delivery) {
+                                return DropdownMenuItem(
+                                  value: delivery,
+                                  child: Text(delivery['delivery_id']),
+                                );
+                              }).toList(),
+                              decoration: InputDecoration(
+                                border: InputBorder.none, // Remove default border
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
                               ),
                             ),
                           ),

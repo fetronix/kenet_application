@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart'; // Import for MediaType
 import 'package:image_picker/image_picker.dart';
 import 'shared_pref_helper.dart';
+import 'dart:convert';
+
 
 class DeliveryReceiving extends StatefulWidget {
   const DeliveryReceiving({Key? key, required String title}) : super(key: key);
@@ -22,6 +24,11 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
   String _personReceiving = ''; // For person receiving the asset
   String? _userId;
 
+  String? _selectedsupplierId; // For storing the selected supplier ID
+  List<Map<String, dynamic>> _suppliers = [];
+  final String supplierApiUrl =
+      'http://197.136.16.164:8000/app/api/suppliers/';
+
   File? _selectedFile;
   String _fileType = ''; // To indicate whether it's an image or a document
 
@@ -32,6 +39,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
   void initState() {
     super.initState();
     _getLoggedInUser();
+    _fetchsuppliers();
   }
 
   Future<void> _getLoggedInUser() async {
@@ -41,6 +49,28 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
       _personReceiving = userId ?? '';
       _userId = userId;
     });
+  }
+
+  Future<void> _fetchsuppliers() async {
+    try {
+      final response = await http.get(Uri.parse(supplierApiUrl));
+      if (response.statusCode == 200) {
+        // Parse the response body
+        final List<dynamic> suppliers = jsonDecode(response.body);
+        setState(() {
+          _suppliers = suppliers.map((supplier) {
+            return {
+              'id': supplier['id'].toString(),
+              'name': supplier['name'], // Assuming 'name' is the supplier name field
+            };
+          }).toList();
+        });
+      } else {
+        throw Exception('Failed to load suppliers');
+      }
+    } catch (e) {
+      print('Error fetching suppliers: $e');
+    }
   }
 
   Future<void> _pickImage(ImageSource source) async {
@@ -82,6 +112,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
       'invoice_number': asset['invoice_number'].toString(),
       'project': asset['project'].toString(),
       'comments': asset['comments'].toString(),
+      'supplier_id': asset['supplier_id'].toString(),
     });
 
     if (file != null) {
@@ -119,11 +150,11 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('Person Receiving: $personReceivingId'),
-              Text('Supplier Name: $_supplierNameController'),
               Text('Quantity: $_quantityController'),
               Text('Invoice Number: $_invoiceNumberController'),
               Text('Project: $_projectController'),
               Text('Comments: $_commentsController'),
+              Text('Supplier Name: ${_suppliers.firstWhere((supplier) => supplier['id'] == _selectedsupplierId)['name'] ?? "Not selected"}'),
               Text('File: ${_selectedFile?.path ?? "No file selected"}'),
             ],
           ),
@@ -133,11 +164,11 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                 final asset = {
                   'date_delivered': DateTime.now().toIso8601String(),
                   'person_receiving': personReceivingId,
-                  'supplier_name': _supplierNameController,
                   'quantity': _quantityController,
                   'invoice_number': _invoiceNumberController,
                   'project': _projectController,
                   'comments': _commentsController,
+                  'supplier_name': _selectedsupplierId,
                 };
                 _saveAsset(asset, _selectedFile);
                 Navigator.of(context).pop(true);
@@ -176,14 +207,21 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                       child: Column(
                         children: [
                           const SizedBox(height: 16),
-                          TextField(
+                          DropdownButtonFormField<String>(
+                            value: _selectedsupplierId,
+                            hint: const Text('Select Supplier '),
+                            items: _suppliers.map((supplier) {
+                              return DropdownMenuItem<String>(
+                                value: supplier['id'],
+                                child: Text(supplier['name']),
+                              );
+                            }).toList(),
                             onChanged: (value) {
                               setState(() {
-                                _supplierNameController = value;
+                                _selectedsupplierId = value;
                               });
                             },
                             decoration: InputDecoration(
-                              labelText: 'Supplier Name',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(30.0),
                               ),
@@ -245,6 +283,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                               ),
                             ),
                           ),
+
                           const SizedBox(height: 16),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
