@@ -231,6 +231,12 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(builder: (context) => AssetReceiving(title: 'fd',)),
     );
   }
+  void _navigateToConsignmentReceiving() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => DeliveryReceiving(title: 'fd',)),
+    );
+  }
 
   // Function to navigate to the cart screen
   void _navigateToCart() {
@@ -434,21 +440,42 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                  child: OutlinedButton.icon(
-                    onPressed: _navigateToAssetReceiving,
-                    icon: Icon(Icons.add, color: Color(0xFF653D82)),
-                    label: Text('Add New Asset', style: TextStyle(color: Color(0xFF653D82))),
-                    style: OutlinedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      side: BorderSide(color: Color(0xFF653D82), width: 2),
-                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(25),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center, // Center the buttons horizontally
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: OutlinedButton.icon(
+                        onPressed: _navigateToAssetReceiving,
+                        icon: Icon(Icons.add, color: Color(0xFF653D82)),
+                        label: Text('Add New Asset', style: TextStyle(color: Color(0xFF653D82))),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          side: BorderSide(color: Color(0xFF653D82), width: 2),
+                          padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: OutlinedButton.icon(
+                        onPressed: _navigateToConsignmentReceiving,
+                        icon: Icon(Icons.add, color: Color(0xFF653D82)),
+                        label: Text('Add New Consignment', style: TextStyle(color: Color(0xFF653D82))),
+                        style: OutlinedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          side: BorderSide(color: Color(0xFF653D82), width: 2),
+                          padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 Expanded(
                   child: _isLoading

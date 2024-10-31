@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:barcode_scan2/barcode_scan2.dart';
+import 'package:kenet_application/addDelivery.dart';
 import 'shared_pref_helper.dart'; // Adjust the import based on your file structure
 
 class AssetReceiving extends StatefulWidget {
@@ -491,6 +492,14 @@ class _AssetReceivingState extends State<AssetReceiving> {
     );
     return result ?? '';
   }
+  void _navigateToDeliveryReceiving() {
+    Navigator.push(
+      context, // Use the current context
+      MaterialPageRoute(
+        builder: (context) => DeliveryReceiving(title: 'fd'), // No need to cast
+      ),
+    );
+  }
 
   Future<bool> _showConfirmationDialog(
       String serialNumber, String kenetTag) async {
@@ -561,6 +570,27 @@ class _AssetReceivingState extends State<AssetReceiving> {
               width: 400, // Set the width of the form here
               child: Column(
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center, // Center the buttons horizontally
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: OutlinedButton.icon(
+                          onPressed: _navigateToDeliveryReceiving,
+                          icon: Icon(Icons.add, color: Color(0xFF653D82)),
+                          label: Text('Register New Consignment', style: TextStyle(color: Color(0xFF653D82))),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: BorderSide(color: Color(0xFF653D82), width: 2),
+                            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                   Card(
                     elevation: 4,
                     child: Padding(

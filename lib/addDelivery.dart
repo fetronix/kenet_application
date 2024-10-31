@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart'; // Import for MediaType
 import 'package:image_picker/image_picker.dart';
+import 'assetreceiving.dart';
 import 'shared_pref_helper.dart';
 import 'dart:convert';
 
@@ -137,6 +138,15 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
     }
   }
 
+  void _navigateToAssetReceiving() {
+    Navigator.push(
+      context, // Use the current context
+      MaterialPageRoute(
+        builder: (context) => AssetReceiving(title: 'fd'), // No need to cast
+      ),
+    );
+  }
+
   Future<bool> _showConfirmationDialog() async {
     SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
     String? personReceivingId = await sharedPrefHelper.getUserId(); // Get user ID
@@ -191,15 +201,40 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Delivery Receiving'),
+
       ),
       body: Center(
+
         child: SingleChildScrollView(
+
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Container(
               width: 400,
               child: Column(
                 children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center, // Center the buttons horizontally
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                        child: OutlinedButton.icon(
+                          onPressed: _navigateToAssetReceiving,
+                          icon: Icon(Icons.add, color: Color(0xFF653D82)),
+                          label: Text('Add New Asset', style: TextStyle(color: Color(0xFF653D82))),
+                          style: OutlinedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            side: BorderSide(color: Color(0xFF653D82), width: 2),
+                            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
                   Card(
                     elevation: 4,
                     child: Padding(
@@ -323,3 +358,5 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
     );
   }
 }
+
+
