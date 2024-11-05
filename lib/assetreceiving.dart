@@ -18,11 +18,14 @@ class _AssetReceivingState extends State<AssetReceiving> {
   String _assetDescriptionModel = '';
   String? _selectedStatus;
   Map<String, dynamic>? _selectedCategory;
-  Map<String, dynamic>? _selectedDelivery;
-  Map<String, dynamic>? _location;
   List<Map<String, dynamic>> _categories = [];
-  List<Map<String, dynamic>> _deliveries = [];
+
+  Map<String, dynamic>? _location;
   List<Map<String, dynamic>> _locations = [];
+
+  Map<String, dynamic>? _selectedDelivery;
+  List<Map<String, dynamic>> _deliveries = [];
+
   List<String> _statuses = [
     'instore',
     'tested',
@@ -69,6 +72,8 @@ class _AssetReceivingState extends State<AssetReceiving> {
     }
   }
 
+
+// Method to fetch deliveries
   Future<void> _fetchDeliveries() async {
     final response = await http.get(Uri.parse(deliveryApiUrl));
     if (response.statusCode == 200) {
@@ -76,7 +81,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
       setState(() {
         _deliveries = deliveryList.map((delivery) => {
           'id': delivery['id'],
-          'delivery_id': delivery['delivery_id'],
+          'details': '${delivery['supplier_name'] ?? "Unknown Supplier"} - Quantity: ${delivery['quantity'] ?? 0} - Invoice: ${delivery['invoice_number'] ?? "No Invoice"}',
         }).toList();
       });
     } else {
@@ -196,7 +201,10 @@ class _AssetReceivingState extends State<AssetReceiving> {
       String? personReceivingId = await sharedPrefHelper.getUserId();
 
       String selectedCategory = _selectedCategory != null ? _selectedCategory!['name'] : "Not Selected";
-      String selectedDelivery = _selectedDelivery != null ? _selectedDelivery!['delivery_id'] : "Not Selected";
+      // Example usage of selected delivery
+      String selectedDelivery = _selectedDelivery != null
+          ? _selectedDelivery!['details'] as String? ?? "Details not available"
+          : "Not Selected";
       String selectedStatus = _selectedStatus ?? "Not Selected";
       String location = _location != null ? _location!['name'] : "Not Selected";
       String date = DateTime.now().toIso8601String();
@@ -640,9 +648,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
                                 });
                               },
                               items: _deliveries.map((delivery) {
-                                return DropdownMenuItem(
+                                return DropdownMenuItem<Map<String, dynamic>>(
                                   value: delivery,
-                                  child: Text(delivery['delivery_id']),
+                                  child: Text(delivery['details'] ?? "No Details Available"), // Change here
                                 );
                               }).toList(),
                               decoration: InputDecoration(

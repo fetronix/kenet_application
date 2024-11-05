@@ -7,7 +7,8 @@ import 'package:kenet_application/settings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'assetreceiving.dart'; // Import the asset receiving screen
-import 'cart.dart'; // Import the cart screen
+import 'cart.dart';
+import 'checkout_screen.dart'; // Import the cart screen
 
 class HomeScreen extends StatefulWidget {
   final String id;
@@ -96,18 +97,50 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // Ensure the asset ID is converted to a string when constructing the URL
+  Future<void> _updateAssetStatus(int assetId, String newStatus) async {
+    final updateUrl = 'http://197.136.16.164:8000/app/assets/$assetId/'; // Ensure assetId is a String
+
+    try {
+      final response = await http.patch(
+        Uri.parse(updateUrl),
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'status': newStatus}),
+      );
+
+      if (response.statusCode == 200) {
+        print('Asset status updated successfully.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Asset status updated to $newStatus')),
+        );
+      } else {
+        final errorResponse = jsonDecode(response.body);
+        print('Failed to update asset status: ${response.statusCode}, ${errorResponse['detail']}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update asset status: ${errorResponse['detail']}')),
+        );
+      }
+    } catch (e) {
+      print('Error updating asset status: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error updating asset status: $e')),
+      );
+    }
+  }
+
+// Also update in the show dialog function
   void _showLocationUpdateDialog(dynamic asset) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Text('Asset: ${asset['asset_description']}'),
-          content: asset['status'] == 'pending_release'
-              ? Text('This asset is pending release. Would you like to add it to the cart?')
-              : TextField(
-            controller: _locationController,
-            decoration: InputDecoration(labelText: 'Enter New Location'),
-          ),
+          content: asset['status'] == 'instore'
+              ? Text('This asset is currently in store. Would you like to add it to the cart and mark it as pending release?')
+              : Text('This asset is already pending release.'),
           actions: [
             TextButton(
               onPressed: () {
@@ -115,79 +148,19 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               child: Text('Cancel'),
             ),
-            asset['status'] == 'pending_release'
-                ? ElevatedButton(
-              onPressed: () {
-                _addToCart(asset['id']);
-                Navigator.of(context).pop(); // Close the dialog after action
-              },
-              child: Text('Add to Cart'),
-            )
-                : ElevatedButton(
-              onPressed: () {
-                _updateAssetLocation(asset);
-                Navigator.of(context).pop(); // Close the dialog after action
-              },
-              child: Text('Update Location'),
-            ),
+            if (asset['status'] == 'instore')
+              ElevatedButton(
+                onPressed: () async {
+                  await _addToCart(asset['id']);
+                  await _updateAssetStatus(asset['id'], 'pending_release'); // Pass asset['id'] as integer here
+                  Navigator.of(context).pop(); // Close the dialog after action
+                },
+                child: Text('Add to Cart'),
+              ),
           ],
         );
       },
     );
-  }
-
-  // Logout function
-  void _logoutUser() async {
-    // Clear user session or token
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('userToken'); // Adjust the key as necessary
-    // Any other necessary cleanup can be done here
-  }
-
-  Future<void> _updateAssetLocation(dynamic asset) async {
-    final newLocation = _locationController.text.trim();
-    if (newLocation.isEmpty) return;
-
-    // Step 1: Update the asset location and status
-    final updateUrl = 'http://197.136.16.164:8000/app/assets/${asset['id']}/';
-    try {
-      final updateResponse = await http.put(
-        Uri.parse(updateUrl),
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'status': 'pending_release',
-          'new_location': newLocation,
-        }),
-      );
-
-      if (updateResponse.statusCode == 200) {
-        // Successfully updated location and status
-        setState(() {
-          asset['new_location'] = newLocation;
-          asset['status'] = 'pending_release';
-          _locationController.clear();
-        });
-
-        // Show snackbar for successful update
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully updated asset location and status')),
-        );
-      } else {
-        // Handle update failure
-        final errorResponse = jsonDecode(updateResponse.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update asset: ${errorResponse['error']}')),
-        );
-      }
-    } catch (e) {
-      print('Error updating asset: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating asset: $e')),
-      );
-    }
   }
 
 
@@ -211,18 +184,27 @@ class _HomeScreenState extends State<HomeScreen> {
         // Handle errors
         final errorResponse = jsonDecode(response.body);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('The Asset is Already in dispatch basket')),
+          SnackBar(content: Text('The Asset is already in dispatch basket: ${errorResponse['detail']}')),
         );
       }
     } catch (e) {
       // Handle network errors
       print('Error adding to cart: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        // SnackBar(content: Text('Error adding to cart: $e')),
-        SnackBar(content: Text('The Asset is Already in dispatch basket')),
+        SnackBar(content: Text('Error adding to cart: $e')),
       );
     }
   }
+
+
+  // Logout function
+  void _logoutUser() async {
+    // Clear user session or token
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('userToken'); // Adjust the key as necessary
+    // Any other necessary cleanup can be done here
+  }
+
 
 
   void _navigateToAssetReceiving() {
@@ -306,6 +288,20 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildMenuButton('Logout', Icons.logout, () {
                 _logoutUser(); // Call your logout function
                 Navigator.of(context).pushReplacementNamed('/login');
+              }),
+              SizedBox(height: 10), // Add spacing between buttons
+              _buildMenuButton('Checkout Screen', Icons.book, () {
+                // Handle Settings tap
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => CheckoutScreen(
+                      accessToken: widget.accessToken
+                      // userEmail: 'user@example.com', // Replace with actual user email
+                    ),
+                  ),
+                );
+
               }),
             ],
           ),
