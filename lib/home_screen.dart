@@ -484,12 +484,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       final asset = _filteredAssets[index];
                       return Card(
                         margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        child: ListTile(
-                          title: Text(asset['asset_description']),
-                          subtitle: Text('Serial Number: ${asset['serial_number']}|Location Received : ${asset['location']['name']}|Location Going : ${asset['new_location']}'),
-                          trailing: IconButton(
-                            icon: Icon(Icons.edit),
-                            onPressed: () => _showLocationUpdateDialog(asset),
+                        child: GestureDetector(
+                          onTap: () => _showLocationUpdateDialog(asset), // Show dialog on item tap
+                          child: ListTile(
+                            title: Text(asset['asset_description']),
+                            subtitle: Text('Serial Number: ${asset['serial_number']} | Location Received: ${asset['location']['name']} | Location Going: ${asset['new_location']}'),
+                            trailing: IconButton(
+                              icon: Icon(Icons.shopping_basket_outlined),
+                              onPressed: () => _showLocationUpdateDialog(asset), // Show dialog when icon is clicked
+                            ),
                           ),
                         ),
                       );
