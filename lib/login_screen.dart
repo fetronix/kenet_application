@@ -3,7 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:kenet_application/shared_pref_helper.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home_screen.dart';  // Make sure to create this file
+import 'adminpage.dart';
+import 'home_screen.dart';  // Import the home screen
+ // Import the admin screen (make sure to create this file)
 import 'dart:developer'; // For logging
 
 class LoginScreen extends StatefulWidget {
@@ -12,13 +14,13 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>();
-  final TextEditingController _usernameController = TextEditingController();
-  final TextEditingController _passwordController = TextEditingController();
-  bool _isLoading = false;
-  String _errorMessage = '';
-  late AnimationController _animationController;
-  late Animation<double> _animation;
+  final _formKey = GlobalKey<FormState>(); // Form key for validation
+  final TextEditingController _usernameController = TextEditingController(); // Controller for username input
+  final TextEditingController _passwordController = TextEditingController(); // Controller for password input
+  bool _isLoading = false; // Loading state
+  String _errorMessage = ''; // Error message to show in the UI
+  late AnimationController _animationController; // Animation controller for blinking lights
+  late Animation<double> _animation; // Animation for blinking lights
 
   @override
   void initState() {
@@ -26,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
-    )..repeat(reverse: true);
+    )..repeat(reverse: true); // Repeat animation for blinking lights
 
     _animation = Tween<double>(begin: 1.0, end: 0.3).animate(
       CurvedAnimation(
@@ -38,20 +40,21 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
-    _animationController.dispose();
+    _usernameController.dispose(); // Dispose the username controller
+    _passwordController.dispose(); // Dispose the password controller
+    _animationController.dispose(); // Dispose the animation controller
     super.dispose();
   }
 
   Future<void> _login() async {
     setState(() {
-      _isLoading = true;
+      _isLoading = true; // Set loading state
     });
 
-    const url = 'http://197.136.16.164:8000/app/api/login/';
+    const url = 'http://197.136.16.164:8000/app/api/login/'; // API URL for login
 
     try {
+      // Send login request
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -61,12 +64,13 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         }),
       );
 
-      log('Response status: ${response.statusCode}');
-      log('Response body: ${response.body}');
+      log('Response status: ${response.statusCode}'); // Log response status
+      log('Response body: ${response.body}'); // Log response body
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = jsonDecode(response.body); // Decode JSON response
 
+        // Save tokens and user info using SharedPrefHelper
         SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
         await sharedPrefHelper.saveAccessToken(data['access']);
         await sharedPrefHelper.saveRefreshToken(data['refresh']);
@@ -81,33 +85,58 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           data['refresh'],
         );
 
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => HomeScreen(
-              id: data['user']['id'].toString(),
-              username: data['user']['username'],
-              firstName: data['user']['first_name'],
-              lastName: data['user']['last_name'],
-              email: data['user']['email'],
-              role: data['user']['role'],
-              accessToken: data['access'],
-              refreshToken: data['refresh'],
+        // Check user role and navigate to the corresponding screen
+        String role = data['user']['role'];
+        if (role == 'noc_user') {
+          // Navigate to HomeScreen for NOC User
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                id: data['user']['id'].toString(),
+                username: data['user']['username'],
+                firstName: data['user']['first_name'],
+                lastName: data['user']['last_name'],
+                email: data['user']['email'],
+                accessToken: data['access'],
+                refreshToken: data['refresh'],
+                role: 'noc_user',
+              ),
             ),
-          ),
-        );
+          );
+        } else if (role == 'network_admin') {
+          // Navigate to AdminScreen for Network Admin
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => AdminScreen(
+                id: data['user']['id'].toString(),
+                username: data['user']['username'],
+                firstName: data['user']['first_name'],
+                lastName: data['user']['last_name'],
+                email: data['user']['email'],
+                accessToken: data['access'],
+                refreshToken: data['refresh'],
+              ),
+            ),
+          );
+        } else {
+          // Handle other roles if needed
+          setState(() {
+            _errorMessage = 'Access denied for your role';
+          });
+        }
       } else {
         setState(() {
-          _errorMessage = 'Invalid credentials';
+          _errorMessage = 'Invalid credentials'; // Set error message for invalid login
         });
       }
     } catch (e) {
-      log('Error during login: $e');
+      log('Error during login: $e'); // Log error
       setState(() {
-        _errorMessage = 'An error occurred. Please try again.';
+        _errorMessage = 'An error occurred. Please try again.'; // Set error message for exceptions
       });
     } finally {
       setState(() {
-        _isLoading = false;
+        _isLoading = false; // Reset loading state
       });
     }
   }
@@ -146,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   ],
                 ),
                 child: Form(
-                  key: _formKey,
+                  key: _formKey, // Assign form key for validation
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -199,7 +228,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your kenet email';
+                            return 'Please enter your kenet email'; // Validation message for empty email
                           }
                           return null;
                         },
@@ -218,7 +247,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         obscureText: true,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your password';
+                            return 'Please enter your password'; // Validation message for empty password
                           }
                           return null;
                         },
@@ -228,7 +257,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         child: SizedBox(
                           width: 100,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _login,
+                            onPressed: _isLoading ? null : _login, // Call login method
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Color(0xFF9C27B0), // Accent color
                               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
@@ -247,12 +276,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ),
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      if (_errorMessage.isNotEmpty)
-                        Text(
-                          _errorMessage,
-                          style: TextStyle(color: Colors.red, fontSize: 16),
-                          textAlign: TextAlign.center,
+                      if (_errorMessage.isNotEmpty) // Display error message if any
+                        Padding(
+                          padding: const EdgeInsets.only(top: 20),
+                          child: Text(
+                            _errorMessage,
+                            style: TextStyle(color: Colors.red, fontSize: 14),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                     ],
                   ),
@@ -266,22 +297,23 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 }
 
+// Custom blinking light widget
 class BLinkingLight extends StatelessWidget {
-  final Animation<double> animation;
-  final Color color;
+  final Animation<double> animation; // Animation for blinking
+  final Color color; // Color of the light
 
-  const BLinkingLight({Key? key, required this.animation, required this.color}) : super(key: key);
+  BLinkingLight({required this.animation, required this.color}); // Constructor
 
   @override
   Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: animation,
+    return FadeTransition(
+      opacity: animation, // Fade transition for blinking effect
       child: Container(
-        width: 20,
-        height: 20,
+        width: 10,
+        height: 10,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: color,
+          color: color, // Set light color
         ),
       ),
     );
