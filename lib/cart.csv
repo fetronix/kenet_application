@@ -13,9 +13,8 @@ class CartScreen extends StatefulWidget {
 }
 
 class _CartScreenState extends State<CartScreen> {
-  List<dynamic> cartItems = [];
+  List<Map<String, dynamic>> cartItems = [];
   Timer? _timer;
-  int _countdown = 0;
 
   @override
   void initState() {
@@ -37,8 +36,10 @@ class _CartScreenState extends State<CartScreen> {
       if (response.statusCode == 200) {
         final List<dynamic> jsonResponse = jsonDecode(response.body);
         setState(() {
-          cartItems = jsonResponse.map((item) {
+          cartItems = jsonResponse.map<Map<String, dynamic>>((item) {
             final assetDetails = _extractAssetDetails(item['asset']);
+            final addedAt = DateTime.parse(item['added_at']);
+            final countdown = _calculateCountdown(addedAt);
             return {
               'id': item['id'],
               'user': item['user'],
@@ -49,11 +50,12 @@ class _CartScreenState extends State<CartScreen> {
               'new_location': assetDetails['new_location'],
               'status': assetDetails['status'],
               'AssetId': assetDetails['AssetId'],
-              'added_at': DateTime.parse(item['added_at']),
+              'added_at': addedAt,
+              'countdown': countdown,
             };
           }).toList();
-          _calculateInitialCountdown();
         });
+        _startCountdown();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to fetch cart items')),
@@ -66,47 +68,82 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  void _calculateInitialCountdown() {
-    if (cartItems.isNotEmpty) {
-      final duration = 300;
-      final now = DateTime.now();
-      for (var item in cartItems) {
-        final addedAt = item['added_at'] as DateTime;
-        final elapsed = now.difference(addedAt).inSeconds;
-        final remaining = duration - elapsed;
-
-        if (remaining > 0) {
-          _countdown = remaining;
-          break;
-        }
-      }
-      if (_countdown > 0) {
-        _startCountdown();
-      }
-    }
+  int _calculateCountdown(DateTime addedAt) {
+    const duration = 30; // 5 minutes in seconds
+    final now = DateTime.now();
+    final elapsed = now.difference(addedAt).inSeconds;
+    return (duration - elapsed).clamp(0, duration);
   }
 
   void _startCountdown() {
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
-        if (_countdown > 0) {
-          _countdown--;
-        } else {
-          _timer?.cancel();
-          _removeAllAssetsFromCart();
+        for (var item in cartItems) {
+          // Check if the item's status is "pending_release"
+          if (item['status'] == 'pending_release') {
+            if (item['countdown'] > 0) {
+              item['countdown']--;
+            } else {
+              // Remove all assets from cart once countdown reaches 0
+              _removeAllAssetsFromCart();
+            }
+          }
         }
       });
     });
   }
+  void _showCheckoutDialog() {
+    final TextEditingController locationController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Confirm Checkout'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: locationController,
+                decoration: InputDecoration(
+                  labelText: 'New Location',
+                  hintText: 'Enter the new location',
+                ),
+              ),
+              SizedBox(height: 16.0),
+              Text('Are you sure you want to proceed with the checkout?'),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final newLocation = locationController.text.trim();
+                if (newLocation.isNotEmpty) {
+                  await _checkout(newLocation); // Pass the new location to the checkout method
+                  Navigator.of(context).pop(); // Close the dialog after checkout
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Please enter a new location')),
+                  );
+                }
+              },
+              child: Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-  Future<void> _checkout() async {
+
+  Future<void> _checkout(String newLocation) async {
     final checkoutUrl = 'http://197.136.16.164:8000/app/checkout/';
-
-    // Prepare only the IDs of cart items for checkout
     final itemsForCheckout = cartItems.map((item) => item['id']).toList();
-
-    // Debugging: Print the checkout payload
-    print('Checkout Payload: ${jsonEncode({'cart_items': itemsForCheckout})}');
 
     try {
       final response = await http.post(
@@ -115,7 +152,10 @@ class _CartScreenState extends State<CartScreen> {
           'Authorization': 'Bearer ${widget.accessToken}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'cart_items': itemsForCheckout}),
+        body: jsonEncode({
+          'cart_items': itemsForCheckout,
+          'new_location': newLocation, // Include new location in the request body
+        }),
       );
 
       if (response.statusCode == 201) {
@@ -137,6 +177,7 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+
   @override
   void dispose() {
     _timer?.cancel();
@@ -144,24 +185,35 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('Dispatch Basket')),
       body: cartItems.isNotEmpty
           ? Column(
         children: [
-          Text('Time left: ${_countdown}s'),
           Expanded(
             child: ListView.builder(
               itemCount: cartItems.length,
               itemBuilder: (context, index) {
                 final item = cartItems[index];
+                final countdown = item['countdown'];
+                final minutes = countdown ~/ 60;
+                final seconds = countdown % 60;
                 return ListTile(
                   title: Text(item['asset_name']),
                   subtitle: Text('Serial: ${item['serial_number']}'),
-                  trailing: IconButton(
-                    icon: Icon(Icons.remove),
-                    onPressed: () => _removeAllAssetsFromCart(),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('$minutes:${seconds.toString().padLeft(2, '0')}'),
+                      IconButton(
+                        icon: Icon(Icons.delete, color: Colors.red),
+                        onPressed: () {
+                          _removeAllAssetsFromCart();
+                        },
+                      ),
+                    ],
                   ),
                 );
               },
@@ -170,7 +222,7 @@ class _CartScreenState extends State<CartScreen> {
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: ElevatedButton(
-              onPressed: _isCheckoutEnabled() ? _checkout : null,
+              onPressed: _isCheckoutEnabled() ? _showCheckoutDialog : null,
               child: Text('Checkout'),
             ),
           ),
@@ -180,8 +232,8 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+
   bool _isCheckoutEnabled() {
-    // Check if all assets are 'pending_release'
     return cartItems.every((item) => item['status'] == 'pending_release');
   }
 
@@ -213,7 +265,6 @@ class _CartScreenState extends State<CartScreen> {
       'name_model': 'N/A',
     };
   }
-
   void _removeAllAssetsFromCart() {
     for (var item in cartItems) {
       _editAsset(item['AssetId']);
@@ -284,4 +335,6 @@ class _CartScreenState extends State<CartScreen> {
       );
     }
   }
+
+
 }
