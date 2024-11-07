@@ -114,16 +114,16 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (response.statusCode == 200) {
-        // print('Asset status updated successfully.');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Asset status updated to $newStatus')),
-        );
+        print('Asset status updated successfully.');
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(content: Text('Asset status updated to $newStatus')),
+        // );
       } else {
         final errorResponse = jsonDecode(response.body);
-        // print('Failed to update asset status: ${response.statusCode}, ${errorResponse['detail']}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update asset status: ${errorResponse['detail']}')),
-        );
+        print('Failed to update asset status: ${response.statusCode}, ${errorResponse['detail']}');
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(content: Text('Failed to update asset status: ${errorResponse['detail']}')),
+        // );
       }
     } catch (e) {
       // print('Error updating asset status: $e');

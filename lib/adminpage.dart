@@ -128,13 +128,36 @@ class _AdminScreenState extends State<AdminScreen> {
     }
   }
 
+  Future<void> _rejectCheckout(int checkoutId) async {
+    final url = 'http://197.136.16.164:8000/app/checkout/$checkoutId/reject/';
+
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        _showSnackbar('Dispatch rejected successfully.');
+        _fetchCheckoutItems(); // Refresh the list after approval
+      } else {
+        _showSnackbar('Failed to reject checkout: ${response.body}');
+      }
+    } catch (e) {
+      _showSnackbar('Error rejecting checkout: $e');
+    }
+  }
+
   void _showApprovalDialog(int checkoutId) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: Text('Approve Users Dispatch'),
-          content: Text('Do you want to approve this checkout?'),
+          title: Text('Approve/Reject Users Dispatch'),
+          content: Text('Do you want to Approve or Reject this Dispacth?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -148,6 +171,13 @@ class _AdminScreenState extends State<AdminScreen> {
                 _approveCheckout(checkoutId); // Call the approval function
               },
               child: Text('Approve'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                _rejectCheckout(checkoutId); // Call the approval function
+              },
+              child: Text('Reject'),
             ),
           ],
         );
@@ -508,7 +538,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                       return assetDetails['status'] == 'approved';
                                     })
                                         ? 'Release Asset'
-                                        : 'Approve',
+                                        : 'Approve/Reject',
                                   ),
                                 )
                               ],
