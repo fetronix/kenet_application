@@ -4,11 +4,13 @@ import 'package:kenet_application/addDelivery.dart';
 import 'package:kenet_application/delivery_screen.dart';
 import 'package:kenet_application/release_form.dart';
 import 'package:kenet_application/settings.dart';
+import 'package:kenet_application/shared_pref_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'assetreceiving.dart'; // Import the asset receiving screen
 import 'cart.dart';
-import 'checkout_screen.dart'; // Import the cart screen
+import 'checkout_screen.dart';
+import 'login_screen.dart'; // Import the cart screen
 
 class HomeScreen extends StatefulWidget {
   final String id;
@@ -112,19 +114,19 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (response.statusCode == 200) {
-        print('Asset status updated successfully.');
+        // print('Asset status updated successfully.');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Asset status updated to $newStatus')),
         );
       } else {
         final errorResponse = jsonDecode(response.body);
-        print('Failed to update asset status: ${response.statusCode}, ${errorResponse['detail']}');
+        // print('Failed to update asset status: ${response.statusCode}, ${errorResponse['detail']}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to update asset status: ${errorResponse['detail']}')),
         );
       }
     } catch (e) {
-      print('Error updating asset status: $e');
+      // print('Error updating asset status: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error updating asset status: $e')),
       );
@@ -189,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       // Handle network errors
-      print('Error adding to cart: $e');
+      // print('Error adding to cart: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error adding to cart: $e')),
       );
@@ -198,12 +200,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   // Logout function
-  void _logoutUser() async {
-    // Clear user session or token
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('userToken'); // Adjust the key as necessary
-    // Any other necessary cleanup can be done here
-  }
+
+    // Logout function to clear tokens and navigate to login
+    Future<void> _logoutUser() async {
+      SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
+      await sharedPrefHelper.clearAllData(); // Assuming this clears stored tokens and user data
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => LoginScreen()),
+      );
+    }
 
 
 

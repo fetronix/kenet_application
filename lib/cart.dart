@@ -68,6 +68,55 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
+  Future<void> _checkout(String newLocation) async {
+    final checkoutUrl = 'http://197.136.16.164:8000/app/checkout/';
+    // Filter cartItems to include only those with status 'pending_release'
+    final itemsForCheckout = cartItems
+        .where((item) => item['status'] == 'pending_release')
+        .map((item) => item['id'])
+        .toList();
+
+    if (itemsForCheckout.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No items with status "pending_release" in the cart')),
+      );
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(checkoutUrl),
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'cart_items': itemsForCheckout,
+          'new_location': newLocation, // Include new location in the request body
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        setState(() {
+          cartItems.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Checkout successful!')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Checkout failed: ${response.statusCode}')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error during checkout: $e')),
+      );
+    }
+  }
+
+
+
   int _calculateCountdown(DateTime addedAt) {
     const duration = 30; // 5 minutes in seconds
     final now = DateTime.now();
@@ -79,14 +128,8 @@ class _CartScreenState extends State<CartScreen> {
     _timer = Timer.periodic(Duration(seconds: 1), (timer) {
       setState(() {
         for (var item in cartItems) {
-          // Check if the item's status is "pending_release"
-          if (item['status'] == 'pending_release') {
-            if (item['countdown'] > 0) {
-              item['countdown']--;
-            } else {
-              // Remove all assets from cart once countdown reaches 0
-              _removeAllAssetsFromCart();
-            }
+          if (item['status'] == 'pending_release' && item['countdown'] > 0) {
+            item['countdown']--;
           }
         }
       });
@@ -139,45 +182,6 @@ class _CartScreenState extends State<CartScreen> {
       },
     );
   }
-
-
-  Future<void> _checkout(String newLocation) async {
-    final checkoutUrl = 'http://197.136.16.164:8000/app/checkout/';
-    final itemsForCheckout = cartItems.map((item) => item['id']).toList();
-
-    try {
-      final response = await http.post(
-        Uri.parse(checkoutUrl),
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'cart_items': itemsForCheckout,
-          'new_location': newLocation, // Include new location in the request body
-        }),
-      );
-
-      if (response.statusCode == 201) {
-        setState(() {
-          cartItems.clear();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Checkout successful!')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Checkout failed: ${response.statusCode}')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error during checkout: $e')),
-      );
-    }
-  }
-
-
   @override
   void dispose() {
     _timer?.cancel();
@@ -185,18 +189,19 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   @override
-  @override
   Widget build(BuildContext context) {
+    final pendingCartItems = cartItems.where((item) => item['status'] == 'pending_release').toList();
+
     return Scaffold(
       appBar: AppBar(title: Text('Dispatch Basket')),
-      body: cartItems.isNotEmpty
+      body: pendingCartItems.isNotEmpty
           ? Column(
         children: [
           Expanded(
             child: ListView.builder(
-              itemCount: cartItems.length,
+              itemCount: pendingCartItems.length,
               itemBuilder: (context, index) {
-                final item = cartItems[index];
+                final item = pendingCartItems[index];
                 final countdown = item['countdown'];
                 final minutes = countdown ~/ 60;
                 final seconds = countdown % 60;
@@ -209,9 +214,9 @@ class _CartScreenState extends State<CartScreen> {
                       Text('$minutes:${seconds.toString().padLeft(2, '0')}'),
                       IconButton(
                         icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: () {
-                          _removeAllAssetsFromCart();
-                        },
+                        onPressed: item['countdown'] > 0
+                            ? () => _removeAssetFromCart(item['id'])
+                            : null,
                       ),
                     ],
                   ),
@@ -232,9 +237,8 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-
   bool _isCheckoutEnabled() {
-    return cartItems.every((item) => item['status'] == 'pending_release');
+    return cartItems.any((item) => item['status'] == 'pending_release');
   }
 
   Map<String, dynamic> _extractAssetDetails(String asset) {
@@ -265,14 +269,8 @@ class _CartScreenState extends State<CartScreen> {
       'name_model': 'N/A',
     };
   }
-  void _removeAllAssetsFromCart() {
-    for (var item in cartItems) {
-      _editAsset(item['AssetId']);
-      _removeAssetFromCart(item['id']);
-    }
-  }
 
-  void _removeAssetFromCart(int assetId) async {
+  Future<void> _removeAssetFromCart(int assetId) async {
     final url = 'http://197.136.16.164:8000/app/cart/remove/$assetId/';
     try {
       final response = await http.delete(
@@ -300,41 +298,4 @@ class _CartScreenState extends State<CartScreen> {
       );
     }
   }
-
-  void _editAsset(int assetId) async {
-    final url = 'http://197.136.16.164:8000/app/assets/$assetId/';
-    final updateData = jsonEncode({
-      'status': 'instore',
-      'new_location': null,
-    });
-
-    try {
-      final response = await http.patch(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-        body: updateData,
-      );
-
-      if (response.statusCode == 200) {
-        // Handle successful update
-        print('Asset updated successfully: ID $assetId');
-      } else {
-        // Log detailed error message
-        print('Failed to update asset: ${response.statusCode} - ${response.body}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update asset: ${response.body}')),
-        );
-      }
-    } catch (e) {
-      print('Error updating asset: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating asset: $e')),
-      );
-    }
-  }
-
-
 }

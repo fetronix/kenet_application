@@ -22,7 +22,7 @@ dependencies:
   printing: ^5.13.2 # Updated to the latest version
   image: ^4.1.0 # Required for image manipulation if you want to add the signature
   http: ^1.0.0
-  signature: ^5.0.0
+  signature: ^5.5.0
   intl: ^0.17.0
 
   image_picker: ^1.1.2

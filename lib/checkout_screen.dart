@@ -136,12 +136,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Checkout ID: ${item['checkout_id']}',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          'User Dispatching : ${item['username']}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                        Text('User: ${item['username']}'), // Display username instead of user ID
-                        Text('Checkout Date: ${item['checkout_date'].toString()}'),
-                        Text('Remarks: ${item['remarks']}'),
+                        Text(
+                            'Checkout Date: ${item['checkout_date']}'),
+                        // Text('Remarks: ${item['remarks']}'),
                         Divider(),
                         Text('Cart Items:', style: TextStyle(fontWeight: FontWeight.bold)),
                         if (item['cart_items'].isNotEmpty)
