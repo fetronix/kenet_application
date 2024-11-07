@@ -492,8 +492,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: GestureDetector(
                           onTap: () => _showLocationUpdateDialog(asset), // Show dialog on item tap
                           child: ListTile(
-                            title: Text(asset['asset_description']),
-                            subtitle: Text('Serial Number: ${asset['serial_number']} | Location Received: ${asset['location']['name']} | Location Going: ${asset['new_location']}'),
+                            title: Text(asset['asset_description'], style: TextStyle(
+                              fontWeight: FontWeight.bold,  // Make asset description bold for some statuses
+                            ),),
+                            subtitle: Text('Serial Number: ${asset['serial_number']} | Kenet Tag: ${asset['kenet_tag']}| Location Received: ${asset['location']['name']}  | Asset Status: ${asset['status']}'),
                             trailing: IconButton(
                               icon: Icon(Icons.shopping_basket_outlined),
                               onPressed: () => _showLocationUpdateDialog(asset), // Show dialog when icon is clicked
