@@ -623,7 +623,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
                           TextField(
                             onChanged: (value) {
                               setState(() {
-                                _assetDescription = value;
+                                _assetDescriptionModel = value;
                               });
                             },
                             decoration: InputDecoration(
@@ -650,9 +650,14 @@ class _AssetReceivingState extends State<AssetReceiving> {
                               items: _deliveries.map((delivery) {
                                 return DropdownMenuItem<Map<String, dynamic>>(
                                   value: delivery,
-                                  child: Text(delivery['details'] ?? "No Details Available"), // Change here
+                                  child: Text(
+                                    delivery['details'] ?? "No Details Available",
+                                    overflow: TextOverflow.ellipsis, // Handles overflow with ellipsis
+                                    maxLines: 1, // Only one line for text
+                                  ),
                                 );
                               }).toList(),
+                              isExpanded: true, // Make sure dropdown stretches to fit
                               decoration: InputDecoration(
                                 border: InputBorder.none, // Remove default border
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
@@ -742,11 +747,16 @@ class _AssetReceivingState extends State<AssetReceiving> {
                                 });
                               },
                               items: _filteredLocations.map((location) {
-                                return DropdownMenuItem(
+                                return DropdownMenuItem<Map<String, dynamic>>(
                                   value: location,
-                                  child: Text(location['name']),
+                                  child: Text(
+                                    location['name'] ?? "No Name Available", // Ensure there's a fallback value
+                                    overflow: TextOverflow.ellipsis, // Handle overflow with ellipsis
+                                    maxLines: 1, // Restrict to a single line
+                                  ),
                                 );
                               }).toList(),
+                              isExpanded: true, // Make sure the dropdown stretches to fit the available space
                               decoration: InputDecoration(
                                 border: InputBorder.none, // Remove default border
                                 contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
@@ -770,7 +780,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
                               ),
                             ],
                           ),
-
                         ],
                       ),
                     ),

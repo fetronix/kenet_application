@@ -1,3 +1,4 @@
+import 'package:url_launcher/url_launcher.dart';  // Add this import
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -66,7 +67,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
-
   Future<void> _loadUserDetails() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -109,6 +109,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     };
   }
 
+  // Method to open an external URL
+  Future<void> _launchURL(String url) async {
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      _showSnackbar('Could not launch $url');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -117,11 +126,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           ? Center(child: CircularProgressIndicator())
           : Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Text('User Details: $userDetails',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ),
           Expanded(
             child: checkoutItems.isNotEmpty
                 ? ListView.builder(
@@ -144,7 +148,6 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ),
                         Text(
                             'Checkout Date: ${item['checkout_date']}'),
-                        // Text('Remarks: ${item['remarks']}'),
                         Divider(),
                         Text('Cart Items:', style: TextStyle(fontWeight: FontWeight.bold)),
                         if (item['cart_items'].isNotEmpty)
@@ -222,6 +225,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                           )
                         else
                           Text('No items in cart.'),
+                        // New button to open external URL
+                        ElevatedButton(
+                          onPressed: () => _launchURL('http://197.136.16.164:8000/app/kenet-release-form/'), // Replace with your URL
+                          child: Text('Open External URL'),
+                        ),
                       ],
                     ),
                   ),

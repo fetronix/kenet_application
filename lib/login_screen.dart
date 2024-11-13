@@ -3,9 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:kenet_application/shared_pref_helper.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'adminpage.dart';
-import 'home_screen.dart';  // Import the home screen
- // Import the admin screen (make sure to create this file)
+import 'home_screen.dart'; // Import the home screen
 import 'dart:developer'; // For logging
 
 class LoginScreen extends StatefulWidget {
@@ -87,8 +85,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
         // Check user role and navigate to the corresponding screen
         String role = data['user']['role'];
-        if (role == 'noc_user') {
-          // Navigate to HomeScreen for NOC User
+
+        if (role == 'can_view' || role == 'can_checkout_items') {
+          // Navigate to HomeScreen for allowed users
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => HomeScreen(
@@ -99,27 +98,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 email: data['user']['email'],
                 accessToken: data['access'],
                 refreshToken: data['refresh'],
-                role: 'noc_user',
-              ),
-            ),
-          );
-        } else if (role == 'network_admin') {
-          // Navigate to AdminScreen for Network Admin
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => AdminScreen(
-                id: data['user']['id'].toString(),
-                username: data['user']['username'],
-                firstName: data['user']['first_name'],
-                lastName: data['user']['last_name'],
-                email: data['user']['email'],
-                accessToken: data['access'],
-                refreshToken: data['refresh'],
+                role: role,  // Passing the role to HomeScreen
               ),
             ),
           );
         } else {
-          // Handle other roles if needed
+          // Show error message if the user is not allowed to log in
           setState(() {
             _errorMessage = 'Access denied for your role';
           });
@@ -140,6 +124,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
       });
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -281,7 +266,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           padding: const EdgeInsets.only(top: 20),
                           child: Text(
                             _errorMessage,
-                            style: TextStyle(color: Colors.red, fontSize: 14),
+                            style: TextStyle(color: Colors.red, fontSize: 16),
                             textAlign: TextAlign.center,
                           ),
                         ),
@@ -297,24 +282,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   }
 }
 
-// Custom blinking light widget
 class BLinkingLight extends StatelessWidget {
-  final Animation<double> animation; // Animation for blinking
-  final Color color; // Color of the light
+  final Animation<double> animation;
+  final Color color;
 
-  BLinkingLight({required this.animation, required this.color}); // Constructor
+  const BLinkingLight({required this.animation, required this.color});
 
   @override
   Widget build(BuildContext context) {
     return FadeTransition(
-      opacity: animation, // Fade transition for blinking effect
-      child: Container(
-        width: 10,
-        height: 10,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: color, // Set light color
-        ),
+      opacity: animation,
+      child: CircleAvatar(
+        radius: 8,
+        backgroundColor: color,
       ),
     );
   }

@@ -1,16 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:kenet_application/addDelivery.dart';
+import 'package:kenet_application/adminpage.dart';
 import 'package:kenet_application/delivery_screen.dart';
-import 'package:kenet_application/release_form.dart';
 import 'package:kenet_application/settings.dart';
 import 'package:kenet_application/shared_pref_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'assetreceiving.dart'; // Import the asset receiving screen
 import 'cart.dart';
 import 'checkout_screen.dart';
 import 'login_screen.dart'; // Import the cart screen
+import 'package:webview_flutter/webview_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
   final String id;
@@ -212,6 +214,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
 
+
   void _navigateToAssetReceiving() {
     Navigator.push(
       context,
@@ -235,6 +238,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+
   void _showMenuDialog() {
     showDialog(
       context: context,
@@ -256,57 +260,65 @@ class _HomeScreenState extends State<HomeScreen> {
                 // Navigate to add assets page
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => AssetReceiving(title: 'fd',)),
+                  MaterialPageRoute(builder: (context) => AssetReceiving(title: 'fd')),
                 );
               }),
-              SizedBox(height: 10), // Add spacing between buttons
+              SizedBox(height: 10),
               _buildMenuButton('Cart', Icons.shopping_cart, () {
                 // Handle Cart tap
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => CartScreen(accessToken:widget.accessToken)),
-                );
-              }),
-              SizedBox(height: 10), // Add spacing between buttons
-              _buildMenuButton('Add Consignment', Icons.assignment_add, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => DeliveryReceiving(title:'')),
+                  MaterialPageRoute(builder: (context) => CartScreen(accessToken: widget.accessToken)),
                 );
               }),
               SizedBox(height: 10),
               _buildMenuButton('View Consignment', Icons.view_agenda, () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => DeliveriesScreen(accessToken:widget.accessToken)),
+                  MaterialPageRoute(builder: (context) => DeliveriesScreen(accessToken: widget.accessToken)),
                 );
               }),
-              SizedBox(height: 10), // Add spacing between buttons
-              _buildMenuButton('Release Form', Icons.book, () {
-                // Handle Settings tap
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => ReleaseForm()),
-                );
-              }),
-              SizedBox(height: 10), // Add spacing between buttons
+              SizedBox(height: 10),
               _buildMenuButton('Logout', Icons.logout, () {
                 _logoutUser(); // Call your logout function
                 Navigator.of(context).pushReplacementNamed('/login');
               }),
-              SizedBox(height: 10), // Add spacing between buttons
+              SizedBox(height: 10),
               _buildMenuButton('Checkout Screen', Icons.book, () {
-                // Handle Settings tap
+                // Handle Checkout Screen tap
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (context) => CheckoutScreen(
-                      accessToken: widget.accessToken
-                      // userEmail: 'user@example.com', // Replace with actual user email
+                      accessToken: widget.accessToken,
                     ),
                   ),
                 );
-
+              }),
+              SizedBox(height: 10),
+              // Conditionally show the "Admin View" button if the user role is "network_admin"
+              if (widget.role == 'can_checkout_items')
+                _buildMenuButton('Verify Dispatch Items', Icons.admin_panel_settings, () {
+                  // Navigate to the Admin View page
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AdminScreen(
+                        id: widget.id,
+                        username: widget.username,
+                        firstName: widget.firstName,
+                        lastName: widget.lastName,
+                        email: widget.email,
+                        accessToken: widget.accessToken,
+                        refreshToken: widget.refreshToken,
+                      ),
+                    ),
+                  );
+                }),
+              SizedBox(height: 10),
+              // New button to open the external URL
+              _buildMenuButton('Open External URL', Icons.link, () {
+                _openExternalURL();
               }),
             ],
           ),
@@ -322,6 +334,18 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+
+  void _openExternalURL() async {
+    const url = 'http://197.136.16.164:8000/app/kenet-release-form/';
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
+  }
+
+
+
 
 // Method to build a rounded button with an icon
   Widget _buildMenuButton(String title, IconData icon, VoidCallback onTap) {
@@ -441,43 +465,6 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center, // Center the buttons horizontally
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: OutlinedButton.icon(
-                        onPressed: _navigateToAssetReceiving,
-                        icon: Icon(Icons.add, color: Color(0xFF653D82)),
-                        label: Text('Add New Asset', style: TextStyle(color: Color(0xFF653D82))),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          side: BorderSide(color: Color(0xFF653D82), width: 2),
-                          padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: OutlinedButton.icon(
-                        onPressed: _navigateToConsignmentReceiving,
-                        icon: Icon(Icons.add, color: Color(0xFF653D82)),
-                        label: Text('Add New Consignment', style: TextStyle(color: Color(0xFF653D82))),
-                        style: OutlinedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          side: BorderSide(color: Color(0xFF653D82), width: 2),
-                          padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
                 Expanded(
                   child: _isLoading
                       ? Center(child: CircularProgressIndicator())
@@ -514,3 +501,4 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+

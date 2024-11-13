@@ -129,11 +129,11 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
     var response = await request.send();
     if (response.statusCode == 201) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Asset added successfully!')),
+        const SnackBar(content: Text('Consignment added successfully!')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to add asset. Error code: ${response.statusCode}')),
+        SnackBar(content: Text('Failed to add Consignment. Error code: ${response.statusCode}')),
       );
     }
   }

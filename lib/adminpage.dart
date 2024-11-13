@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signature/signature.dart';
-import 'dart:convert';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -43,7 +42,6 @@ class _AdminScreenState extends State<AdminScreen> {
     _fetchCheckoutItems();
     _loadUserDetails();
   }
-
   Future<void> _fetchCheckoutItems() async {
     final url = 'http://197.136.16.164:8000/app/checkoutsadmin/';
 
@@ -219,11 +217,6 @@ class _AdminScreenState extends State<AdminScreen> {
                   decoration: InputDecoration(labelText: 'Quantity Issued'),
                   keyboardType: TextInputType.number,
                 ),
-                TextField(
-                  controller: authorizingNameController,
-                  decoration: InputDecoration(labelText: 'Authorizing Name'),
-                ),
-                SizedBox(height: 20),
                 Text('Signature'),
                 Container(
                   height: 100,
@@ -272,7 +265,7 @@ class _AdminScreenState extends State<AdminScreen> {
                   'remarks': remarksController.text,
                   'quantity_required': int.tryParse(quantityRequiredController.text) ?? 1,
                   'quantity_issued': int.tryParse(quantityIssuedController.text) ?? 1,
-                  'authorizing_name': authorizingNameController.text,
+                  'authorizing_name':  widget.email,
                   if (signatureBase64 != null) 'signature_image': signatureBase64,
                 };
 
@@ -357,6 +350,10 @@ class _AdminScreenState extends State<AdminScreen> {
             style: TextStyle(color: Colors.white),
           ),
           backgroundColor: Color(0xFF9C27B0),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
         ),
         body: RefreshIndicator(
           onRefresh: _fetchCheckoutItems, // Pull-to-refresh function
