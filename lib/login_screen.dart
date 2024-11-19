@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:kenet_application/shared_pref_helper.dart';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'home_screen.dart'; // Import the home screen
-import 'dart:developer'; // For logging
+import 'package:kenet_application/shared_pref_helper.dart';
+import 'package:kenet_application/allUrls.dart';
+import 'package:kenet_application/home_screen.dart';
+import 'dart:developer';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -12,21 +12,22 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  final _formKey = GlobalKey<FormState>(); // Form key for validation
-  final TextEditingController _usernameController = TextEditingController(); // Controller for username input
-  final TextEditingController _passwordController = TextEditingController(); // Controller for password input
-  bool _isLoading = false; // Loading state
-  String _errorMessage = ''; // Error message to show in the UI
-  late AnimationController _animationController; // Animation controller for blinking lights
-  late Animation<double> _animation; // Animation for blinking lights
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  bool _isLoading = false;
+  String _errorMessage = '';
+  late AnimationController _animationController;
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
+    _checkLoginStatus();
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
-    )..repeat(reverse: true); // Repeat animation for blinking lights
+    )..repeat(reverse: true);
 
     _animation = Tween<double>(begin: 1.0, end: 0.3).animate(
       CurvedAnimation(
@@ -36,23 +37,75 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
+  void _checkLoginStatus() async {
+    try {
+      SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
+
+      // Get tokens from shared preferences
+      String? accessToken = await sharedPrefHelper.getAccessToken();
+      String? refreshToken = await sharedPrefHelper.getRefreshToken();
+
+      if (accessToken != null && refreshToken != null) {
+        // Get user details from shared preferences
+        String? id = await sharedPrefHelper.getUserId();
+        Map<String, String?> userInfo = await sharedPrefHelper.getUserInfo();
+
+
+
+        // Ensure all required details are present
+        if (id != null &&
+            userInfo['username'] != null &&
+            userInfo['first_name'] != null &&
+            userInfo['last_name'] != null &&
+            userInfo['email'] != null &&
+            userInfo['role'] != null) {
+          // Navigate to HomeScreen with user details
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => HomeScreen(
+                id: id,
+                username: userInfo['username']!,
+                firstName: userInfo['first_name']!,
+                lastName: userInfo['last_name']!,
+                email: userInfo['email']!,
+                accessToken: accessToken,
+                refreshToken: refreshToken,
+                role: userInfo['role']!,
+              ),
+            ),
+          );
+        } else {
+          log('Incomplete user information in shared preferences');
+        }
+      }
+    } catch (e) {
+      log('Error checking login status: $e');
+    }
+  }
+
+
+
+
   @override
   void dispose() {
-    _usernameController.dispose(); // Dispose the username controller
-    _passwordController.dispose(); // Dispose the password controller
-    _animationController.dispose(); // Dispose the animation controller
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
+  /// Handles the login process
   Future<void> _login() async {
+    if (!_formKey.currentState!.validate()) return;
+
     setState(() {
-      _isLoading = true; // Set loading state
+      _isLoading = true;
+      _errorMessage = '';
     });
 
-    const url = 'http://197.136.16.164:8000/app/api/login/'; // API URL for login
+    const url = ApiUrls.login;
 
     try {
-      // Send login request
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -62,13 +115,12 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         }),
       );
 
-      log('Response status: ${response.statusCode}'); // Log response status
-      log('Response body: ${response.body}'); // Log response body
+      log('Response status: ${response.statusCode}');
+      log('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body); // Decode JSON response
+        final data = jsonDecode(response.body);
 
-        // Save tokens and user info using SharedPrefHelper
         SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
         await sharedPrefHelper.saveAccessToken(data['access']);
         await sharedPrefHelper.saveRefreshToken(data['refresh']);
@@ -83,11 +135,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           data['refresh'],
         );
 
-        // Check user role and navigate to the corresponding screen
         String role = data['user']['role'];
 
         if (role == 'can_view' || role == 'can_checkout_items') {
-          // Navigate to HomeScreen for allowed users
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => HomeScreen(
@@ -98,33 +148,31 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                 email: data['user']['email'],
                 accessToken: data['access'],
                 refreshToken: data['refresh'],
-                role: role,  // Passing the role to HomeScreen
+                role: role,
               ),
             ),
           );
         } else {
-          // Show error message if the user is not allowed to log in
           setState(() {
             _errorMessage = 'Access denied for your role';
           });
         }
       } else {
         setState(() {
-          _errorMessage = 'Invalid credentials'; // Set error message for invalid login
+          _errorMessage = 'Invalid credentials';
         });
       }
     } catch (e) {
-      log('Error during login: $e'); // Log error
+      log('Error during login: $e');
       setState(() {
-        _errorMessage = 'An error occurred. Please try again.'; // Set error message for exceptions
+        _errorMessage = 'An error occurred. Please try again.';
       });
     } finally {
       setState(() {
-        _isLoading = false; // Reset loading state
+        _isLoading = false;
       });
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -133,8 +181,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              Color(0xFF00BCD4), // Primary color
-              Color(0xFF673AB7), // Secondary color
+              Color(0xFF00BCD4),
+              Color(0xFF673AB7),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -160,19 +208,18 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                   ],
                 ),
                 child: Form(
-                  key: _formKey, // Assign form key for validation
+                  key: _formKey,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Center(
                         child: Image.asset(
-                          'assets/images/logo.png', // Update with your image path
+                          'assets/images/logo.png',
                           width: 100,
                           height: 100,
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Blinking lights above the "Welcome Back" text
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -204,7 +251,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       TextFormField(
                         controller: _usernameController,
                         decoration: InputDecoration(
-                          labelText: 'kenet email',
+                          labelText: 'Kenet Email',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
@@ -213,7 +260,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your kenet email'; // Validation message for empty email
+                            return 'Please enter your Kenet email';
                           }
                           return null;
                         },
@@ -232,7 +279,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         obscureText: true,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your password'; // Validation message for empty password
+                            return 'Please enter your password';
                           }
                           return null;
                         },
@@ -242,9 +289,9 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         child: SizedBox(
                           width: 100,
                           child: ElevatedButton(
-                            onPressed: _isLoading ? null : _login, // Call login method
+                            onPressed: _isLoading ? null : _login,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Color(0xFF9C27B0), // Accent color
+                              backgroundColor: Color(0xFF9C27B0),
                               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 20),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(15),
@@ -261,7 +308,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ),
                         ),
                       ),
-                      if (_errorMessage.isNotEmpty) // Display error message if any
+                      if (_errorMessage.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 20),
                           child: Text(

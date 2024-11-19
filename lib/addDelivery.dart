@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart'; // Import for MediaType
 import 'package:image_picker/image_picker.dart';
+import 'package:kenet_application/allUrls.dart';
 import 'assetreceiving.dart';
 import 'shared_pref_helper.dart';
 import 'dart:convert';
@@ -27,13 +28,12 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
 
   String? _selectedsupplierId; // For storing the selected supplier ID
   List<Map<String, dynamic>> _suppliers = [];
-  final String supplierApiUrl =
-      'http://197.136.16.164:8000/app/api/suppliers/';
+  final String supplierApiUrl =ApiUrls.supplierurl;
 
   File? _selectedFile;
   String _fileType = ''; // To indicate whether it's an image or a document
 
-  final String apiUrl = 'http://197.136.16.164:8000/app/delivery/new/';
+  final String apiUrl = ApiUrls.addconsignmenturl;
   final ImagePicker _imagePicker = ImagePicker();
 
   @override
@@ -213,28 +213,6 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
               width: 400,
               child: Column(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center, // Center the buttons horizontally
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: OutlinedButton.icon(
-                          onPressed: _navigateToAssetReceiving,
-                          icon: Icon(Icons.add, color: Color(0xFF653D82)),
-                          label: Text('Add New Asset', style: TextStyle(color: Color(0xFF653D82))),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            side: BorderSide(color: Color(0xFF653D82), width: 2),
-                            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
                   Card(
                     elevation: 4,
                     child: Padding(
@@ -326,7 +304,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                               ElevatedButton.icon(
                                 onPressed: () => _pickImage(ImageSource.camera),
                                 icon: const Icon(Icons.camera),
-                                label: const Text('Take Picture'),
+                                label: const Text('Delivery Note/Invoice File Picture'),
                               ),
                               ElevatedButton.icon(
                                 onPressed: _pickFile,

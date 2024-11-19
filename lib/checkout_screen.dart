@@ -1,13 +1,33 @@
-import 'package:url_launcher/url_launcher.dart';  // Add this import
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:kenet_application/allUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:signature/signature.dart';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
+import 'package:url_launcher/url_launcher.dart';
 
 class CheckoutScreen extends StatefulWidget {
+  final String id;
+  final String username;
+  final String firstName;
+  final String lastName;
+  final String email;
   final String accessToken;
+  final String refreshToken;
 
-  const CheckoutScreen({Key? key, required this.accessToken}) : super(key: key);
+  const CheckoutScreen({
+    Key? key,
+    required this.id,
+    required this.username,
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    required this.accessToken,
+    required this.refreshToken,
+  }) : super(key: key);
 
   @override
   _CheckoutScreenState createState() => _CheckoutScreenState();
@@ -16,17 +36,17 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   List<dynamic> checkoutItems = [];
   bool isLoading = true;
-  String userDetails = ""; // Variable to hold user details
+  String userDetails = "";
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _fetchCheckoutItems();
-    _loadUserDetails(); // Load user details from SharedPreferences
+    _loadUserDetails();
   }
-
   Future<void> _fetchCheckoutItems() async {
-    final url = 'http://197.136.16.164:8000/app/checkouts/';
+    final url = ApiUrls.checkoutuserList;
 
     try {
       final response = await http.get(
@@ -38,28 +58,32 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       );
 
       if (response.statusCode == 200) {
-        print('Response body: ${response.body}');
         final List<dynamic> jsonResponse = jsonDecode(response.body);
 
         setState(() {
           checkoutItems = jsonResponse.map((item) {
+            final cartItems = item['cart_items'] is List ? item['cart_items'] : [];
             return {
               'checkout_id': item['id'],
-              'username': item['cart_items'][0]['user'], // Ensure cart_items array exists
+              'username': cartItems.isNotEmpty ? cartItems[0]['user'] : 'Unknown User',
               'checkout_date': item['checkout_date'] != null
                   ? DateTime.parse(item['checkout_date'])
                   : DateTime.now(),
               'remarks': item['remarks'] ?? 'No Remarks',
-              'cart_items': item['cart_items'] is List ? item['cart_items'] : [],
+              'cart_items': cartItems,
+              'image_user': item['user_signature_image'],
+              'image_user_admin': item['signature_image'],
+
             };
           }).toList();
+          print(checkoutItems);
         });
       } else {
-        _showSnackbar('Failed to fetch checkout items: ${response.body}'); // Show error response body for debugging
+        _showSnackbar('Failed to fetch checkout items: ${response.body}');
       }
     } catch (e) {
-      print('Error fetching checkout items: $e');
       _showSnackbar('Error fetching checkout items: $e');
+      print('Error fetching checkout items: $e');
     } finally {
       setState(() {
         isLoading = false;
@@ -67,11 +91,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+
   Future<void> _loadUserDetails() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       userDetails = prefs.getString('userDetails') ?? 'No user details found';
-      print(userDetails);
     });
   }
 
@@ -79,6 +103,135 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+
+  // Method to open an external URL
+  Future<void> _launchURL(String url) async {
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      _showSnackbar('Could not launch $url');
+    }
+  }
+
+
+  void _logout() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('userDetails'); // Clear stored user details
+    Navigator.of(context).pushReplacementNamed('/login'); // Navigate to login page
+  }
+
+  void _viewPdf(int checkoutId) {
+    // Launch the URL with the provided checkoutId
+    _launchURL(ApiUrls.getCheckoutDetail(checkoutId));
+  }
+
+
+  void _showCheckoutDialog(int checkoutId) async {
+    final TextEditingController remarksController = TextEditingController();
+    final SignatureController signatureController = SignatureController(penColor: Colors.blue);
+
+    // Calculate the total count of items in the checkout cart
+    final int totalItems = checkoutItems.fold<int>(0, (sum, item) {
+      return sum + (item['cart_items'] as List).length;
+    });
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Update The Download PDF'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Please Add your Signature to Download PDF'),
+                Container(
+                  height: 100,
+                  width: 300,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.black),
+                  ),
+                  child: Signature(
+                    controller: signatureController,
+                    backgroundColor: Colors.grey[200]!,
+                  ),
+                ),
+                SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    signatureController.clear();
+                  },
+                  child: Text('Clear Signature'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Convert the signature to base64 if provided
+                String? signatureBase64;
+                try {
+                  if (signatureController.isNotEmpty) {
+                    final signatureImage = await signatureController.toImage();
+                    final pngBytes = await signatureImage!.toByteData(format: ui.ImageByteFormat.png);
+                    signatureBase64 = base64Encode(pngBytes!.buffer.asUint8List());
+                  }
+                } catch (e) {
+                  _showSnackbar("Error encoding your signature: $e");
+                }
+
+                // Gather the input data
+                final updatedData = {
+                  if (signatureBase64 != null) 'user_signature_image': signatureBase64,
+                };
+
+                // Send the updated data to your checkout update method here
+                await _updateCheckout(checkoutId, updatedData);
+
+                Navigator.of(context).pop(); // Close the dialog after confirmation
+              },
+              child: Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+
+  Future<void> _updateCheckout(int checkoutId, Map<String, dynamic> updatedData) async {
+    final url = ApiUrls.updateuserCheckoutDetail(checkoutId); // Update with your actual URL
+    final token = widget.accessToken; // Replace with the user's actual auth token
+
+    // Add authorization and necessary headers
+    final headers = {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+    };
+
+    // Make the HTTP PUT request to update the checkout
+    final response = await http.put(
+      Uri.parse(url),
+      headers: headers,
+      body: jsonEncode(updatedData),
+    );
+
+    if (response.statusCode == 200) {
+
+      _showSnackbar("Checkout data updated successfully");
+    } else {
+      _showSnackbar("Error: ${response.body}");
+    }
   }
 
   Map<String, dynamic> _extractAssetDetails(String asset) {
@@ -109,137 +262,141 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     };
   }
 
-  // Method to open an external URL
-  Future<void> _launchURL(String url) async {
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      _showSnackbar('Could not launch $url');
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Checkout Items')),
-      body: isLoading
-          ? Center(child: CircularProgressIndicator())
-          : Column(
-        children: [
-          Expanded(
-            child: checkoutItems.isNotEmpty
-                ? ListView.builder(
-              itemCount: checkoutItems.length,
-              itemBuilder: (context, index) {
-                final item = checkoutItems[index];
-                return Card(
-                  margin: EdgeInsets.all(8.0),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'User Dispatching : ${item['username']}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap: () {
+        FocusScope.of(context).unfocus(); // Dismiss the keyboard
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false, // Remove the back button
+          title: Text(
+            'Dispatch List Dashboard',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Color(0xFF9C27B0),
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ),
+        body: RefreshIndicator(
+          onRefresh: _fetchCheckoutItems, // Pull-to-refresh function
+          child:Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(height: 20),
+                isLoading
+                    ? Center(child: CircularProgressIndicator())
+                    : Expanded(
+                  child: checkoutItems.isNotEmpty
+                      ? ListView.builder(
+                    itemCount: checkoutItems.length,
+                    itemBuilder: (context, index) {
+                      final item = checkoutItems[index];
+                      final cartItems = item['cart_items'] as List;
+
+                      print('showing all your details');
+                      print(item);
+
+// Check if the 'user_signature_image' URL is valid
+                      final signatureImageAvailable = item['image_user'] == null ||
+                          item['image_user'].isEmpty ||
+                          item['image_user'] == 'Image empty';
+
+                      if (signatureImageAvailable) {
+                        print('image not available');
+                      } else {
+                        print('Image available');
+                      }
+
+
+                      // Print checkout data
+                      print('Checkout Data: $item');
+                      return GestureDetector(
+                        child: Card(
+                          margin: EdgeInsets.all(8.0),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'User Dispatching: ${item['username']}',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                Text('Checkout Date: ${item['checkout_date']}'),
+                                Divider(),
+                                Text(
+                                  'Cart Items:',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                if (cartItems.isEmpty)
+                                  Text('No items in this checkout', style: TextStyle(color: Colors.red)),
+                                if (cartItems.isNotEmpty)
+                                  Column(
+                                    children: cartItems.map<Widget>((cartItem) {
+                                      final assetDetails = _extractAssetDetails(cartItem['asset']);
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text('Asset Name: ${assetDetails['name'] ?? 'N/A'}'),
+                                            Text('Serial Number: ${assetDetails['serial_number'] ?? 'N/A'}'),
+                                            Text('KNET Tag: ${assetDetails['kenet_tag'] ?? 'N/A'}'),
+                                            Text('Going Location: ${assetDetails['new_location'] ?? 'N/A'}'),
+                                            Divider(),
+                                          ],
+                                        ),
+                                      );
+                                    }).toList(),
+                                  )
+                                else
+                                  Text('No items in the cart.'),
+                                // Conditionally render the button
+                                if (cartItems.isNotEmpty)
+                                ElevatedButton(
+                                  onPressed: () {
+                                    if (item['image_user'] == null ||
+                                        item['image_user'].isEmpty ||
+                                        item['image_user'] == 'Image empty') {
+                                      // Show Add Signature dialog
+                                      _showCheckoutDialog(item['checkout_id']);
+                                    } else {
+                                      // Show PDF viewing screen (assuming you have a method for this)
+                                      _viewPdf(item['checkout_id']);
+                                    }
+                                  },
+                                  child: Text(
+                                    item['image_user'] == null ||
+                                        item['image_user'].isEmpty ||
+                                        item['image_user'] == 'Image empty'
+                                        ? 'Add Signature'
+                                        : 'View PDF',
+                                  ),
+                                )
+                              ],
+                            ),
                           ),
                         ),
-                        Text(
-                            'Checkout Date: ${item['checkout_date']}'),
-                        Divider(),
-                        Text('Cart Items:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        if (item['cart_items'].isNotEmpty)
-                          Table(
-                            border: TableBorder.all(),
-                            columnWidths: {
-                              0: FlexColumnWidth(2),
-                              1: FlexColumnWidth(2),
-                              2: FlexColumnWidth(1),
-                              3: FlexColumnWidth(1),
-                              4: FlexColumnWidth(1),
-                              5: FlexColumnWidth(1),
-                            },
-                            children: [
-                              TableRow(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text('Asset Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text('Serial Number', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text('KNET Tag', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text('Location', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ),
-                                  Padding(
-                                    padding: const EdgeInsets.all(8.0),
-                                    child: Text('New Location', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                              ...item['cart_items'].map<TableRow>((cartItem) {
-                                final assetDetails = _extractAssetDetails(cartItem['asset']);
-                                return TableRow(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(assetDetails['name']),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(assetDetails['serial_number']),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(assetDetails['kenet_tag']),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(assetDetails['location_received']),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(assetDetails['status']),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Text(assetDetails['new_location']),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ],
-                          )
-                        else
-                          Text('No items in cart.'),
-                        // New button to open external URL
-                        ElevatedButton(
-                          onPressed: () => _launchURL('http://197.136.16.164:8000/app/kenet-release-form/'), // Replace with your URL
-                          child: Text('Open External URL'),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            )
-                : Center(child: Text('No checkout items available.')),
+                      );
+                    },
+                  )
+                      : Center(child: Text('No checkout items available.')),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }
+
 }

@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:kenet_application/addDelivery.dart';
+import 'allUrls.dart';
 import 'shared_pref_helper.dart'; // Adjust the import based on your file structure
 
 class AssetReceiving extends StatefulWidget {
@@ -37,14 +38,11 @@ class _AssetReceivingState extends State<AssetReceiving> {
   final TextEditingController _searchController = TextEditingController();
   String _serialPrefix = '';
 
-  final String apiUrl = 'http://197.136.16.164:8000/app/assets/';
-  final String categoryApiUrl =
-      'http://197.136.16.164:8000/app/api/categories/';
+  final String apiUrl = ApiUrls.apiUrl;
+  final String categoryApiUrl = ApiUrls.categoryApiUrl;
 
-  final String deliveryApiUrl =
-      'http://197.136.16.164:8000/app/api/mydeliveries/';
-  final String locationApiUrl =
-      'http://197.136.16.164:8000/app/api/locations/';
+  final String deliveryApiUrl = ApiUrls.deliveryApiUrl;
+  final String locationApiUrl = ApiUrls.locationApiUrl;
 
   @override
   void initState() {
@@ -599,6 +597,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
                       ),
                     ],
                   ),
+                  const SizedBox(height: 16),
                   Card(
                     elevation: 4,
                     child: Padding(
@@ -613,7 +612,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
                               });
                             },
                             decoration: InputDecoration(
-                              labelText: 'Asset Description',
+                              labelText: 'Asset Name. for example.... Hp Laptop',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(30.0), // Rounded border
                               ),
@@ -627,7 +626,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
                               });
                             },
                             decoration: InputDecoration(
-                              labelText: 'Asset Description Model',
+                              labelText: 'Asset  Model. for example... 840 G3',
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(30.0), // Rounded border
                               ),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:kenet_application/allUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signature/signature.dart';
 import 'dart:typed_data';
@@ -43,7 +44,7 @@ class _AdminScreenState extends State<AdminScreen> {
     _loadUserDetails();
   }
   Future<void> _fetchCheckoutItems() async {
-    final url = 'http://197.136.16.164:8000/app/checkoutsadmin/';
+    final url = ApiUrls.checkoutList;
 
     try {
       final response = await http.get(
@@ -55,34 +56,35 @@ class _AdminScreenState extends State<AdminScreen> {
       );
 
       if (response.statusCode == 200) {
-
         final List<dynamic> jsonResponse = jsonDecode(response.body);
 
         setState(() {
           checkoutItems = jsonResponse.map((item) {
+            final cartItems = item['cart_items'] is List ? item['cart_items'] : [];
             return {
               'checkout_id': item['id'],
-              'username': item['cart_items'][0]['user'], // Ensure cart_items array exists
+              'username': cartItems.isNotEmpty ? cartItems[0]['user'] : 'Unknown User',
               'checkout_date': item['checkout_date'] != null
                   ? DateTime.parse(item['checkout_date'])
                   : DateTime.now(),
               'remarks': item['remarks'] ?? 'No Remarks',
-              'cart_items': item['cart_items'] is List ? item['cart_items'] : [],
+              'cart_items': cartItems,
             };
           }).toList();
         });
       } else {
-        _showSnackbar('Failed to fetch checkout items: ${response.body}'); // Show error response body for debugging
+        _showSnackbar('Failed to fetch checkout items: ${response.body}');
       }
     } catch (e) {
-
       _showSnackbar('Error fetching checkout items: $e');
+      print('Error fetching checkout items: $e');
     } finally {
       setState(() {
         isLoading = false;
       });
     }
   }
+
 
   Future<void> _loadUserDetails() async {
     final prefs = await SharedPreferences.getInstance();
@@ -104,7 +106,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _approveCheckout(int checkoutId) async {
-    final url = 'http://197.136.16.164:8000/app/checkout/$checkoutId/approve/';
+    final url = ApiUrls.approveCheckoutDetail(checkoutId);
 
     try {
       final response = await http.post(
@@ -127,7 +129,7 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
   Future<void> _rejectCheckout(int checkoutId) async {
-    final url = 'http://197.136.16.164:8000/app/checkout/$checkoutId/reject/';
+    final url = ApiUrls.rejectCheckoutDetail(checkoutId);
 
     try {
       final response = await http.post(
@@ -188,10 +190,12 @@ class _AdminScreenState extends State<AdminScreen> {
 
   void _showCheckoutDialog(int checkoutId) async {
     final TextEditingController remarksController = TextEditingController();
-    final TextEditingController quantityRequiredController = TextEditingController();
-    final TextEditingController quantityIssuedController = TextEditingController();
-    final TextEditingController authorizingNameController = TextEditingController();
-    final SignatureController signatureController = SignatureController(penColor: Colors.black);
+    final SignatureController signatureController = SignatureController(penColor: Colors.blue);
+
+    // Calculate the total count of items in the checkout cart
+    final int totalItems = checkoutItems.fold<int>(0, (sum, item) {
+      return sum + (item['cart_items'] as List).length;
+    });
 
     showDialog(
       context: context,
@@ -202,22 +206,7 @@ class _AdminScreenState extends State<AdminScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: remarksController,
-                  decoration: InputDecoration(labelText: 'Remarks'),
-                  maxLines: 3,
-                ),
-                TextField(
-                  controller: quantityRequiredController,
-                  decoration: InputDecoration(labelText: 'Quantity Required'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: quantityIssuedController,
-                  decoration: InputDecoration(labelText: 'Quantity Issued'),
-                  keyboardType: TextInputType.number,
-                ),
-                Text('Signature'),
+                Text('Please Add your Signature to Verify'),
                 Container(
                   height: 100,
                   width: 300,
@@ -263,9 +252,9 @@ class _AdminScreenState extends State<AdminScreen> {
                 // Gather the input data
                 final updatedData = {
                   'remarks': remarksController.text,
-                  'quantity_required': int.tryParse(quantityRequiredController.text) ?? 1,
-                  'quantity_issued': int.tryParse(quantityIssuedController.text) ?? 1,
-                  'authorizing_name':  widget.email,
+                  'quantity_required': totalItems,
+                  'quantity_issued': totalItems,
+                  'authorizing_name': widget.email,
                   if (signatureBase64 != null) 'signature_image': signatureBase64,
                 };
 
@@ -283,8 +272,9 @@ class _AdminScreenState extends State<AdminScreen> {
   }
 
 
+
   Future<void> _updateCheckout(int checkoutId, Map<String, dynamic> updatedData) async {
-    final url = 'http://197.136.16.164:8000/app/checkout/$checkoutId/update/'; // Update with your actual URL
+    final url = ApiUrls.updateCheckoutDetail(checkoutId); // Update with your actual URL
     final token = widget.accessToken; // Replace with the user's actual auth token
 
     // Add authorization and necessary headers
@@ -412,8 +402,12 @@ class _AdminScreenState extends State<AdminScreen> {
                     itemCount: checkoutItems.length,
                     itemBuilder: (context, index) {
                       final item = checkoutItems[index];
+                      final cartItems = item['cart_items'] as List;
+                      final hasOnSiteStatus = item['cart_items'].any((cartItem) {
+                        final assetDetails = _extractAssetDetails(cartItem['asset']);
+                        return assetDetails['status'] == 'onsite';
+                      });
                       return GestureDetector(
-                        onTap: () => _showApprovalDialog(item['checkout_id']),
                         child: Card(
                           margin: EdgeInsets.all(8.0),
                           child: Padding(
@@ -434,110 +428,54 @@ class _AdminScreenState extends State<AdminScreen> {
                                   'Cart Items:',
                                   style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
-                                if (item['cart_items'].isNotEmpty)
-                                  Table(
-                                    border: TableBorder.all(),
-                                    columnWidths: {
-                                      0: FlexColumnWidth(2),
-                                      1: FlexColumnWidth(2),
-                                      2: FlexColumnWidth(1),
-                                      3: FlexColumnWidth(1),
-                                      4: FlexColumnWidth(1),
-                                      5: FlexColumnWidth(1),
-                                    },
-                                    children: [
-                                      TableRow(
-                                        children: [
-                                          Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Text('Asset Name', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Text('Serial Number', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Text('KNET Tag', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Text('Received Location', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Text('Status', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                          Padding(
-                                            padding: const EdgeInsets.all(8.0),
-                                            child: Text('New Location', style: TextStyle(fontWeight: FontWeight.bold)),
-                                          ),
-                                        ],
-                                      ),
-                                      ...item['cart_items'].map<TableRow>((cartItem) {
-
-                                        final assetDetails = _extractAssetDetails(cartItem['asset']);
-                                        // Debugging asset details
-                                        return TableRow(
+                                if (cartItems.isEmpty)
+                                  Text('No items in this checkout', style: TextStyle(color: Colors.red)),
+                                if (cartItems.isNotEmpty)
+                                  Column(
+                                    children: cartItems.map<Widget>((cartItem) {
+                                      final assetDetails = _extractAssetDetails(cartItem['asset']);
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Padding(
-                                              padding: const EdgeInsets.all(8.0),
-                                              child: Text(assetDetails['name'] ?? 'N/A'),  // Default to 'N/A' if null
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(8.0),
-                                              child: Text(assetDetails['serial_number'] ?? 'N/A'),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(8.0),
-                                              child: Text(assetDetails['kenet_tag'] ?? 'N/A'),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(8.0),
-                                              child: Text(assetDetails['location_received'] ?? 'N/A'),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(8.0),
-                                              child: Text(assetDetails['status'] ?? 'N/A'),
-                                            ),
-                                            Padding(
-                                              padding: const EdgeInsets.all(8.0),
-                                              child: Text(assetDetails['new_location'] ?? 'N/A'),
-                                            ),
+                                            Text('Asset Name: ${assetDetails['name'] ?? 'N/A'}'),
+                                            Text('Serial Number: ${assetDetails['serial_number'] ?? 'N/A'}'),
+                                            Text('KNET Tag: ${assetDetails['kenet_tag'] ?? 'N/A'}'),
+                                            Text('New Location: ${assetDetails['new_location'] ?? 'N/A'}'),
+                                            Divider(),
                                           ],
-                                        );
-                                      }).toList(),
-                                    ],
+                                        ),
+                                      );
+                                    }).toList(),
                                   )
                                 else
                                   Text('No items in the cart.'),
-                                // Conditional button rendering
-                                ElevatedButton(
-                                  onPressed: () {
+                                // Conditionally render the button
+                                if (!hasOnSiteStatus && cartItems.isNotEmpty)
+                                  // if (cartItems.isNotEmpty)
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      bool isApproved = cartItems.any((cartItem) {
+                                        final assetDetails = _extractAssetDetails(cartItem['asset']);
+                                        return assetDetails['status'] == 'approved';
+                                      });
 
-
-                                    bool isApproved = item['cart_items'].any((cartItem) {
-                                      final assetDetails = _extractAssetDetails(cartItem['asset']); // Parsing the asset string
-                                      return assetDetails['status'] == 'approved';  // Check status
-                                    });
-
-                                    if (isApproved) {
-                                      _showCheckoutDialog(item['checkout_id']);
-
-                                    } else {
-                                      // If not approved, approve the checkout
-                                      _approveCheckout(item['checkout_id']);
-                                    }
-                                  },
-                                  child: Text(
-                                    item['cart_items'].any((cartItem) {
-                                      final assetDetails = _extractAssetDetails(cartItem['asset']);
-                                      return assetDetails['status'] == 'approved';
-                                    })
-                                        ? 'Release Asset'
-                                        : 'Approve/Reject',
+                                      if (isApproved) {
+                                        _showCheckoutDialog(item['checkout_id']);
+                                      } else {
+                                        _approveCheckout(item['checkout_id']);
+                                      }
+                                    },
+                                    child: Text(
+                                      cartItems.any((cartItem) {
+                                        final assetDetails = _extractAssetDetails(cartItem['asset']);
+                                        return assetDetails['status'] == 'approved';
+                                      })
+                                          ? 'Release Asset'
+                                          : 'Approve',
+                                    ),
                                   ),
-                                )
                               ],
                             ),
                           ),
@@ -545,9 +483,9 @@ class _AdminScreenState extends State<AdminScreen> {
                       );
                     },
                   )
-
                       : Center(child: Text('No checkout items available.')),
-                ),
+                )
+,
               ],
             ),
           ),
@@ -555,4 +493,5 @@ class _AdminScreenState extends State<AdminScreen> {
       ),
     );
   }
+
 }

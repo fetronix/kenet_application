@@ -15,33 +15,19 @@ import 'checkout_screen.dart';
 import 'login_screen.dart'; // Import the cart screen
 import 'package:webview_flutter/webview_flutter.dart';
 
-class HomeScreen extends StatefulWidget {
-  final String id;
-  final String username;
-  final String firstName;
-  final String lastName;
-  final String email;
-  final String role;
-  final String accessToken;
-  final String refreshToken;
+class FaultyScreen extends StatefulWidget {
 
-  const HomeScreen({
-    Key? key,
-    required this.id,
-    required this.username,
-    required this.firstName,
-    required this.lastName,
-    required this.email,
-    required this.role,
-    required this.accessToken,
-    required this.refreshToken,
+  final String accessToken;
+
+  const FaultyScreen({
+    Key? key, required String title,required this.accessToken
   }) : super(key: key);
 
   @override
-  _HomeScreenState createState() => _HomeScreenState();
+  _FaultyScreenState createState() => _FaultyScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _FaultyScreenState extends State<FaultyScreen> {
   List<dynamic> _assets = [];
   List<dynamic> _filteredAssets = [];
   List<dynamic> _cart = []; // Cart to hold selected assets
@@ -102,9 +88,8 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Ensure the asset ID is converted to a string when constructing the URL
-  Future<void> _updateAssetStatus(int assetId, String newStatus) async {
-    final updateUrl = ApiUrls.getAssetDetail(assetId);
+  Future<void> _updateAssetStatus(int assetId) async {
+    final updateUrl = ApiUrls.faultyAssetDetail(assetId);
     try {
       final response = await http.patch(
         Uri.parse(updateUrl),
@@ -112,39 +97,56 @@ class _HomeScreenState extends State<HomeScreen> {
           'Authorization': 'Bearer ${widget.accessToken}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'status': newStatus}),
+        body: jsonEncode({'status': "faulty"}),
       );
 
       if (response.statusCode == 200) {
         print('Asset status updated successfully.');
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   SnackBar(content: Text('Asset status updated to $newStatus')),
-        // );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Asset return and marked as faulty successfully.')),
+        );
       } else {
-        final errorResponse = jsonDecode(response.body);
-        print('Failed to update asset status: ${response.statusCode}, ${errorResponse['detail']}');
-        // ScaffoldMessenger.of(context).showSnackBar(
-        //   SnackBar(content: Text('Failed to update asset status: ${errorResponse['detail']}')),
-        // );
+        print('Failed to update asset status: ${response.statusCode}');
       }
     } catch (e) {
-      // print('Error updating asset status: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error updating asset status: $e')),
-      );
+      print('Error updating asset status: $e');
     }
   }
 
-// Also update in the show dialog function
+  Future<void> _DecommissionupdateAssetStatus(int assetId) async {
+    final updateUrl = ApiUrls.decommissionedAssetDetail(assetId);
+    try {
+      final response = await http.patch(
+        Uri.parse(updateUrl),
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'status': "decommissioned"}),
+      );
+
+      if (response.statusCode == 200) {
+        print('Asset status updated successfully.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Asset return and marked as decommissioned successfully.')),
+        );
+      } else {
+        print('Failed to update asset status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error updating asset status: $e');
+    }
+  }
+
   void _showLocationUpdateDialog(dynamic asset) {
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
           title: Text('Asset: ${asset['asset_description']}'),
-          content: asset['status'] == 'instore'
-              ? Text('This asset is currently in store. Would you like to add it to the cart and mark it as pending release?')
-              : Text('This asset is not In store kindly check other Items'),
+          content: asset['status'] == 'faulty' || asset['status'] == 'decommissioned'
+              ? Text('This asset is already faulty or decommissioned. Kindly check other items.')
+              : Text('Do you want to return this asset and mark it as Faulty or Decommissioned?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -152,14 +154,23 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               child: Text('Cancel'),
             ),
-            if (asset['status'] == 'instore')
+            // Show the Faulty Asset button only if it's not already faulty
+            if (asset['status'] != 'faulty' && asset['status'] != 'decommissioned')
               ElevatedButton(
                 onPressed: () async {
-                  await _addToCart(asset['id']);
-                  await _updateAssetStatus(asset['id'], 'pending_release'); // Pass asset['id'] as integer here
+                  await _updateAssetStatus(asset['id']); // Pass asset['id'] as integer here
                   Navigator.of(context).pop(); // Close the dialog after action
                 },
-                child: Text('Add to Cart'),
+                child: Text('Faulty Asset'),
+              ),
+            // Show the Decommission Asset button only if it's not already decommissioned
+            if (asset['status'] != 'decommissioned' && asset['status'] != 'faulty')
+              ElevatedButton(
+                onPressed: () async {
+                  await _DecommissionupdateAssetStatus(asset['id']); // Pass asset['id'] as integer here
+                  Navigator.of(context).pop(); // Close the dialog after action
+                },
+                child: Text('Decommission Asset'),
               ),
           ],
         );
@@ -168,37 +179,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-  Future<void> _addToCart(int assetId) async {
-    final url = ApiUrls.addToCart(assetId);
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer ${widget.accessToken}',
-          'Content-Type': 'application/json',
-        },
-      );
 
-      if (response.statusCode == 201) {
-        // Successfully added to cart
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully added asset to dispatch basket')),
-        );
-      } else {
-        // Handle errors
-        final errorResponse = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('The Asset is already in dispatch basket: ${errorResponse['detail']}')),
-        );
-      }
-    } catch (e) {
-      // Handle network errors
-      // print('Error adding to cart: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding to cart: $e')),
-      );
-    }
-  }
+
+
 
 
   // Logout function
@@ -239,108 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-  void _showMenuDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Column(
-            children: [
-              Image.asset(
-                'assets/images/logo.png', // Replace with your logo asset path
-                height: 100, // Adjust the height as needed
-              ),
-              Divider(), // Divider below the logo
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildMenuButton('Add Assets', Icons.add_circle, () {
-                // Navigate to add assets page
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => AssetReceiving(title: 'fd')),
-                );
-              }),
-              SizedBox(height: 10),
-              _buildMenuButton('Cart', Icons.shopping_cart, () {
-                // Handle Cart tap
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => CartScreen(accessToken: widget.accessToken)),
-                );
-              }),
-              SizedBox(height: 10),
-              _buildMenuButton('View Consignment', Icons.view_agenda, () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => DeliveriesScreen(accessToken: widget.accessToken)),
-                );
-              }),
-              SizedBox(height: 10),
-              _buildMenuButton('Logout', Icons.logout, () {
-                _logoutUser(); // Call your logout function
-                Navigator.of(context).pushReplacementNamed('/login');
-              }),
-              SizedBox(height: 10),
-              _buildMenuButton('Checkout Screen', Icons.book, () {
-                // Handle Checkout Screen tap
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => CheckoutScreen(
-                      id: widget.id,
-                      username: widget.username,
-                      firstName: widget.firstName,
-                      lastName: widget.lastName,
-                      email: widget.email,
-                      accessToken: widget.accessToken,
-                      refreshToken: widget.refreshToken,
-                    ),
-                  ),
-                );
-              }),
-              SizedBox(height: 10),
-              // Conditionally show the "Admin View" button if the user role is "network_admin"
-              if (widget.role == 'can_checkout_items')
-                _buildMenuButton('Verify Dispatch Items', Icons.admin_panel_settings, () {
-                  // Navigate to the Admin View page
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AdminScreen(
-                        id: widget.id,
-                        username: widget.username,
-                        firstName: widget.firstName,
-                        lastName: widget.lastName,
-                        email: widget.email,
-                        accessToken: widget.accessToken,
-                        refreshToken: widget.refreshToken,
-                      ),
-                    ),
-                  );
-                }),
-              SizedBox(height: 10),
-              // New button to open the external URL
-              if (widget.role == 'can_checkout_items')
-              _buildMenuButton('Admin Portal', Icons.link, () {
-                _openExternalURL();
-              }),
-            ],
-          ),
-          actions: [
-            TextButton(
-              child: Text('Close'),
-              onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
-              },
-            ),
-          ],
-        );
-      },
-    );
-  }
+
 
   void _openExternalURL() async {
     const url = ApiUrls.adminportal;
@@ -394,46 +276,11 @@ class _HomeScreenState extends State<HomeScreen> {
         appBar: AppBar(
           title: Center(
             child: Text(
-              'Welcome back, ${widget.username}',
+              'Return faulty or decommissioned Asset',
               style: TextStyle(color: Colors.white),
             ),
           ),
           backgroundColor: Color(0xFF653D82),
-          actions: [
-            IconButton(
-              iconSize: 30,
-              icon: Container(
-                padding: EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                ),
-                child: Icon(
-                  Icons.shopping_cart,
-                  size: 30,
-                  color: Colors.black,
-                ),
-
-              ),
-              onPressed: _navigateToCart, // Navigate to the cart
-            ),
-            IconButton(
-              iconSize: 40, // Increase the size of the icon
-              icon: Container(
-                padding: EdgeInsets.all(8), // Add padding for a better touch target
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.transparent, // Keep background transparent
-                ),
-                child: Icon(
-                  Icons.menu,
-                  size: 30, // You can also adjust this size if needed
-                  color: Colors.white, // Set the icon color to white
-                ),
-              ),
-              onPressed: _showMenuDialog, // Show the menu dialog
-            ),
-          ],
         ),
         body: Container(
           decoration: BoxDecoration(
@@ -478,36 +325,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       : _errorMessage.isNotEmpty
                       ? Center(child: Text(_errorMessage))
                       : ListView.builder(
-                    itemCount: _filteredAssets
-                        .where((asset) => asset['status'] == 'instore')
-                        .length,
+                    itemCount: _filteredAssets.length,
                     itemBuilder: (context, index) {
-                      // Filter the assets with status "in store"
-                      final filteredAssets = _filteredAssets
-                          .where((asset) => asset['status'] == 'instore')
-                          .toList();
-                      final asset = filteredAssets[index];
-
+                      final asset = _filteredAssets[index];
                       return Card(
                         margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         child: GestureDetector(
-                          onTap: () => _showLocationUpdateDialog(asset),
+                          onTap: () => _showLocationUpdateDialog(asset), // Show dialog on item tap
                           child: ListTile(
-                            title: Text(
-                              asset['asset_description'],
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold, // Highlight description
-                              ),
-                            ),
-                            subtitle: Text(
-                              'Serial Number: ${asset['serial_number']} | '
-                                  'Kenet Tag: ${asset['kenet_tag']} | '
-                                  'Location Received: ${asset['location']['name']} | '
-                                  'Asset Status: ${asset['status']}',
-                            ),
+                            title: Text(asset['asset_description'], style: TextStyle(
+                              fontWeight: FontWeight.bold,  // Make asset description bold for some statuses
+                            ),),
+                            subtitle: Text('Serial Number: ${asset['serial_number']} | Kenet Tag: ${asset['kenet_tag']}| Location Received: ${asset['location']['name']}  | Asset Status: ${asset['status']}'),
                             trailing: IconButton(
-                              icon: Icon(Icons.shopping_basket_outlined),
-                              onPressed: () => _showLocationUpdateDialog(asset),
+                              icon: Icon(Icons.bus_alert_sharp),
+                              onPressed: () => _showLocationUpdateDialog(asset), // Show dialog when icon is clicked
                             ),
                           ),
                         ),

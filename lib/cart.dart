@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:kenet_application/allUrls.dart';
+import 'package:kenet_application/shared_pref_helper.dart';
 
 class CartScreen extends StatefulWidget {
   final String accessToken;
@@ -14,16 +15,127 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   List<Map<String, dynamic>> cartItems = [];
-  Timer? _timer;
+
+
+  // Define a hardcoded list of locations
+  final String locationApiUrl = ApiUrls.locationApiUrl;
+  Map<String, dynamic>? _location;
+  Map<String, dynamic>? _user;
+  List<Map<String, dynamic>> _locations = [];
+  List<Map<String, dynamic>> _users = [];
+  List<Map<String, dynamic>> _filteredLocations = [];
+  List<Map<String, dynamic>> _filteredUsers = [];
+  final TextEditingController _searchController = TextEditingController();
+
+
 
   @override
   void initState() {
     super.initState();
     _fetchCartItems();
+    _fetchLocations();
+    _fetchUsers();
+    _filteredLocations = _locations;
+    _filteredUsers = _users;
   }
 
+  Future<void> _fetchLocations() async {
+    
+    print("FETCHING LOCATIONS");
+    final response = await http.get(Uri.parse(locationApiUrl));
+    if (response.statusCode == 200) {
+      List<dynamic> locationList = jsonDecode(response.body);
+      setState(() {
+        _locations = locationList.map((location) => {
+          'id': location['id'],
+          'name': location['name'],
+        }).toList();
+        _filteredLocations = _locations;
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load locations: ${response.body}')),
+      );
+    }
+
+    print("DONE FETCHING LOCATIONS");
+  }
+
+  void _filterLocations(String query) {
+    final filtered = _locations.where((location) {
+      return location['name'].toLowerCase().contains(query.toLowerCase());
+    }).toList();
+    setState(() {
+      _filteredLocations = filtered;
+    });
+  }
+
+
+  Future<void> _fetchUsers() async {
+    try {
+      final response = await http.get(Uri.parse(ApiUrls.usersadminurl));
+
+      if (response.statusCode == 200) {
+        List<dynamic> usersList = jsonDecode(response.body);
+
+        // Debugging: Print the raw response
+        print('Raw Users Data: ${response.body}');
+
+        // Retrieve the logged-in user's ID using SharedPrefHelper
+        final String? loggedInUserId = await SharedPrefHelper().getUserId();
+
+        // Ensure the ID is not null before proceeding
+        if (loggedInUserId == null) {
+          throw Exception('Logged-in user ID not found');
+        }
+
+        // Filter out the logged-in user
+        List<Map<String, dynamic>> filteredUsers = usersList
+            .where((user) => user['id'].toString() != loggedInUserId) // Exclude logged-in user
+            .map((user) => {
+          'id': user['id'],
+          'username': user['username'],
+          'name': user['first_name'] + " " + user['last_name'], // Use 'name' consistently
+        })
+            .toList();
+
+        setState(() {
+          _users = filteredUsers;
+
+          // Debugging: Print the processed users list
+          print('Processed Users List: $_users');
+
+          _filteredUsers = _users;
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load Users: ${response.body}')),
+        );
+      }
+    } catch (e) {
+      // Handle errors gracefully
+      print('Error fetching users: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading users: $e')),
+      );
+    }
+  }
+
+
+
+  void _filterusers(String query) {
+    final filtered = _users.where((user) {
+      return user['first_name'].toLowerCase().contains(query.toLowerCase());
+    }).toList();
+    setState(() {
+      _filteredUsers = filtered;
+    });
+  }
+
+
+
   Future<void> _fetchCartItems() async {
-    final url = 'http://197.136.16.164:8000/app/cart/';
+    final url = ApiUrls.cartList;
     try {
       final response = await http.get(
         Uri.parse(url),
@@ -38,8 +150,6 @@ class _CartScreenState extends State<CartScreen> {
         setState(() {
           cartItems = jsonResponse.map<Map<String, dynamic>>((item) {
             final assetDetails = _extractAssetDetails(item['asset']);
-            final addedAt = DateTime.parse(item['added_at']);
-            final countdown = _calculateCountdown(addedAt);
             return {
               'id': item['id'],
               'user': item['user'],
@@ -47,15 +157,12 @@ class _CartScreenState extends State<CartScreen> {
               'serial_number': assetDetails['serial_number'],
               'kenet_tag': assetDetails['kenet_tag'],
               'location_received': assetDetails['location_received'],
-              'new_location': assetDetails['new_location'],
+              'new_location': assetDetails['going_location'],
               'status': assetDetails['status'],
               'AssetId': assetDetails['AssetId'],
-              'added_at': addedAt,
-              'countdown': countdown,
             };
           }).toList();
         });
-        _startCountdown();
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to fetch cart items')),
@@ -68,8 +175,8 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Future<void> _checkout(String newLocation) async {
-    final checkoutUrl = 'http://197.136.16.164:8000/app/checkout/';
+  Future<void> _checkout(String location, String verify_user) async {
+    final checkoutUrl = ApiUrls.checkoutDetail;
     // Filter cartItems to include only those with status 'pending_release'
     final itemsForCheckout = cartItems
         .where((item) => item['status'] == 'pending_release')
@@ -92,7 +199,8 @@ class _CartScreenState extends State<CartScreen> {
         },
         body: jsonEncode({
           'cart_items': itemsForCheckout,
-          'new_location': newLocation, // Include new location in the request body
+          'new_location': location,
+          'verified_user':verify_user, // Include new location in the request body
         }),
       );
 
@@ -115,28 +223,8 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-
-
-  int _calculateCountdown(DateTime addedAt) {
-    const duration = 30; // 5 minutes in seconds
-    final now = DateTime.now();
-    final elapsed = now.difference(addedAt).inSeconds;
-    return (duration - elapsed).clamp(0, duration);
-  }
-
-  void _startCountdown() {
-    _timer = Timer.periodic(Duration(seconds: 1), (timer) {
-      setState(() {
-        for (var item in cartItems) {
-          if (item['status'] == 'pending_release' && item['countdown'] > 0) {
-            item['countdown']--;
-          }
-        }
-      });
-    });
-  }
   void _showCheckoutDialog() {
-    final TextEditingController locationController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (context) {
@@ -145,11 +233,80 @@ class _CartScreenState extends State<CartScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextField(
-                controller: locationController,
+              TextFormField(
+                controller: _searchController,
                 decoration: InputDecoration(
-                  labelText: 'New Location',
-                  hintText: 'Enter the new location',
+                  labelText: 'Search Location',
+                  prefixIcon: Icon(Icons.search), // Adding search icon inside the search bar
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0), // Making the border rounded
+                  ),
+                ),
+                onChanged: (query) {
+                  _filterLocations(query);
+                },
+              ),
+
+              const SizedBox(height: 16),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30.0), // Adjust the radius as needed
+                  border: Border.all(color: Colors.grey), // Set border color and width
+                ),
+                child: DropdownButtonFormField<Map<String, dynamic>>(
+                  hint: const Text('Select Location'),
+                  value: _location,
+                  onChanged: (value) {
+                    setState(() {
+                      _location = value;
+                    });
+                  },
+                  items: _filteredLocations.map((location) {
+                    return DropdownMenuItem<Map<String, dynamic>>(
+                      value: location,
+                      child: Text(
+                        location['name'] ?? "No Name Available", // Ensure there's a fallback value
+                        overflow: TextOverflow.ellipsis, // Handle overflow with ellipsis
+                        maxLines: 1, // Restrict to a single line
+                      ),
+                    );
+                  }).toList(),
+                  isExpanded: true, // Make sure the dropdown stretches to fit the available space
+                  decoration: InputDecoration(
+                    border: InputBorder.none, // Remove default border
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
+                  ),
+                ),
+              ),
+              SizedBox(height: 16.0),
+              Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(30.0),
+                  border: Border.all(color: Colors.grey),
+                ),
+                child: DropdownButtonFormField<Map<String, dynamic>>(
+                  hint: const Text('Select verifier'),
+                  value: _user,
+                  onChanged: (value) {
+                    setState(() {
+                      _user = value;
+                    });
+                  },
+                  items: _filteredUsers.map((user) {
+                    return DropdownMenuItem<Map<String, dynamic>>(
+                      value: user,
+                      child: Text(
+                        user['name'] ?? "No Name Available", // Match the key used in _fetchUsers
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                  ),
                 ),
               ),
               SizedBox(height: 16.0),
@@ -159,19 +316,18 @@ class _CartScreenState extends State<CartScreen> {
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop(); // Close the dialog
+                Navigator.of(context).pop();
               },
               child: Text('Cancel'),
             ),
             TextButton(
               onPressed: () async {
-                final newLocation = locationController.text.trim();
-                if (newLocation.isNotEmpty) {
-                  await _checkout(newLocation); // Pass the new location to the checkout method
-                  Navigator.of(context).pop(); // Close the dialog after checkout
+                if (_location!['name'] != null || _user!['username']  != null) {
+                  await _checkout(_location!['name'], _user!['username']);
+                  Navigator.of(context).pop();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Please enter a new location')),
+                    SnackBar(content: Text('Please select a location')),
                   );
                 }
               },
@@ -182,11 +338,6 @@ class _CartScreenState extends State<CartScreen> {
       },
     );
   }
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -196,33 +347,26 @@ class _CartScreenState extends State<CartScreen> {
       appBar: AppBar(title: Text('Dispatch Basket')),
       body: pendingCartItems.isNotEmpty
           ? Column(
+
         children: [
           Expanded(
-            child: ListView.builder(
+              child: RefreshIndicator(
+              onRefresh: _fetchCartItems,
+            child:
+            ListView.builder(
               itemCount: pendingCartItems.length,
               itemBuilder: (context, index) {
                 final item = pendingCartItems[index];
-                final countdown = item['countdown'];
-                final minutes = countdown ~/ 60;
-                final seconds = countdown % 60;
                 return ListTile(
                   title: Text(item['asset_name']),
                   subtitle: Text('Serial: ${item['serial_number']}'),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('$minutes:${seconds.toString().padLeft(2, '0')}'),
-                      IconButton(
-                        icon: Icon(Icons.delete, color: Colors.red),
-                        onPressed: item['countdown'] > 0
-                            ? () => _removeAssetFromCart(item['id'])
-                            : null,
-                      ),
-                    ],
+                  trailing: IconButton(
+                    icon: Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _removeAssetFromCart(item['id']),
                   ),
                 );
               },
-            ),
+            ),)
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),
@@ -271,7 +415,7 @@ class _CartScreenState extends State<CartScreen> {
   }
 
   Future<void> _removeAssetFromCart(int assetId) async {
-    final url = 'http://197.136.16.164:8000/app/cart/remove/$assetId/';
+    final url = ApiUrls.removecart(assetId);
     try {
       final response = await http.delete(
         Uri.parse(url),
@@ -285,16 +429,16 @@ class _CartScreenState extends State<CartScreen> {
           cartItems.removeWhere((item) => item['id'] == assetId);
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Item removed from dispatch basket successfully')),
+          SnackBar(content: Text('Asset removed from cart')),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to remove item from dispatch basket')),
+          SnackBar(content: Text('Failed to remove asset from cart')),
         );
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error removing item from Dispatch basket: $e')),
+        SnackBar(content: Text('Error removing asset from cart: $e')),
       );
     }
   }

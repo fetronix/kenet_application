@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:kenet_application/addDelivery.dart';
 import 'package:kenet_application/adminpage.dart';
+import 'package:kenet_application/allUrls.dart';
 import 'package:kenet_application/delivery_screen.dart';
+import 'package:kenet_application/faulty_assets.dart';
 import 'package:kenet_application/settings.dart';
 import 'package:kenet_application/shared_pref_helper.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,7 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchAssets() async {
-    final url = 'http://197.136.16.164:8000/app/api/assets/';
+    final url = ApiUrls.assetList;
 
     try {
       final response = await http.get(
@@ -103,8 +105,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Ensure the asset ID is converted to a string when constructing the URL
   Future<void> _updateAssetStatus(int assetId, String newStatus) async {
-    final updateUrl = 'http://197.136.16.164:8000/app/assets/$assetId/'; // Ensure assetId is a String
-
+    final updateUrl = ApiUrls.getAssetDetail(assetId);
     try {
       final response = await http.patch(
         Uri.parse(updateUrl),
@@ -144,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
           title: Text('Asset: ${asset['asset_description']}'),
           content: asset['status'] == 'instore'
               ? Text('This asset is currently in store. Would you like to add it to the cart and mark it as pending release?')
-              : Text('This asset is already pending release.'),
+              : Text('This asset is not In store kindly check other Items'),
           actions: [
             TextButton(
               onPressed: () {
@@ -169,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   Future<void> _addToCart(int assetId) async {
-    final url = 'http://197.136.16.164:8000/app/cart/add/$assetId/';
+    final url = ApiUrls.addToCart(assetId);
     try {
       final response = await http.post(
         Uri.parse(url),
@@ -182,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 201) {
         // Successfully added to cart
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Successfully added asset to dispatch basket')),
+          SnackBar(content: Text('Successfully added asset to dispatch basket, You have 24hrs before your items are deleted automatically')),
         );
       } else {
         // Handle errors
@@ -256,6 +257,14 @@ class _HomeScreenState extends State<HomeScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              _buildMenuButton('Return Faulty/Decommissioned Asset', Icons.bus_alert_sharp, () {
+                // Navigate to add assets page
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => FaultyScreen(title: '',accessToken:widget.accessToken)),
+                );
+              }),
+              SizedBox(height: 10),
               _buildMenuButton('Add Assets', Icons.add_circle, () {
                 // Navigate to add assets page
                 Navigator.push(
@@ -290,7 +299,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   context,
                   MaterialPageRoute(
                     builder: (context) => CheckoutScreen(
+                      id: widget.id,
+                      username: widget.username,
+                      firstName: widget.firstName,
+                      lastName: widget.lastName,
+                      email: widget.email,
                       accessToken: widget.accessToken,
+                      refreshToken: widget.refreshToken,
                     ),
                   ),
                 );
@@ -317,7 +332,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 }),
               SizedBox(height: 10),
               // New button to open the external URL
-              _buildMenuButton('Open External URL', Icons.link, () {
+              if (widget.role == 'can_checkout_items')
+              _buildMenuButton('Admin Portal', Icons.link, () {
                 _openExternalURL();
               }),
             ],
@@ -336,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openExternalURL() async {
-    const url = 'http://197.136.16.164:8000/app/kenet-release-form/';
+    const url = ApiUrls.adminportal;
     if (await canLaunch(url)) {
       await launch(url);
     } else {
@@ -432,7 +448,7 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color(0xFF6A5ACD),
+                Color(0xFF8A2BE2),
                 Color(0xFF8A2BE2),
               ],
               begin: Alignment.topLeft,
@@ -471,21 +487,36 @@ class _HomeScreenState extends State<HomeScreen> {
                       : _errorMessage.isNotEmpty
                       ? Center(child: Text(_errorMessage))
                       : ListView.builder(
-                    itemCount: _filteredAssets.length,
+                    itemCount: _filteredAssets
+                        .where((asset) => asset['status'] == 'instore')
+                        .length,
                     itemBuilder: (context, index) {
-                      final asset = _filteredAssets[index];
+                      // Filter the assets with status "in store"
+                      final filteredAssets = _filteredAssets
+                          .where((asset) => asset['status'] == 'instore')
+                          .toList();
+                      final asset = filteredAssets[index];
+
                       return Card(
                         margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                         child: GestureDetector(
-                          onTap: () => _showLocationUpdateDialog(asset), // Show dialog on item tap
+                          onTap: () => _showLocationUpdateDialog(asset),
                           child: ListTile(
-                            title: Text(asset['asset_description'], style: TextStyle(
-                              fontWeight: FontWeight.bold,  // Make asset description bold for some statuses
-                            ),),
-                            subtitle: Text('Serial Number: ${asset['serial_number']} | Kenet Tag: ${asset['kenet_tag']}| Location Received: ${asset['location']['name']}  | Asset Status: ${asset['status']}'),
+                            title: Text(
+                              asset['asset_description'],
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold, // Highlight description
+                              ),
+                            ),
+                            subtitle: Text(
+                              'Serial Number: ${asset['serial_number']} | '
+                                  'Kenet Tag: ${asset['kenet_tag']} | '
+                                  'Location Received: ${asset['location']['name']} | '
+                                  'Asset Status: ${asset['status']}',
+                            ),
                             trailing: IconButton(
                               icon: Icon(Icons.shopping_basket_outlined),
-                              onPressed: () => _showLocationUpdateDialog(asset), // Show dialog when icon is clicked
+                              onPressed: () => _showLocationUpdateDialog(asset),
                             ),
                           ),
                         ),
@@ -493,6 +524,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                 ),
+
               ],
             ),
           ),

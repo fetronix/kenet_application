@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:kenet_application/addDelivery.dart'; // Import your add delivery screen
+import 'package:kenet_application/allUrls.dart';
 import 'package:url_launcher/url_launcher.dart'; // Import for launching URLs
 
 class DeliveriesScreen extends StatefulWidget {
@@ -35,7 +36,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   }
 
   Future<void> _fetchDeliveries() async {
-    final url = 'http://197.136.16.164:8000/app/api/delivery/'; // Update with your actual API endpoint for deliveries
+    final url = ApiUrls.deliveryallApiUrl; // Update with your actual API endpoint for deliveries
 
     try {
       final response = await http.get(
