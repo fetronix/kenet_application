@@ -7,6 +7,8 @@ class ApiUrls {
   // Authentication Endpoints
   static const String login = '$baseUrl/api/login/';
 
+  static const String Appversion = 'http://197.136.16.164:8000/api/latest_version/';
+
 
   //adding consignment  Ednpoints
   static const String supplierurl = '$baseUrl/api/suppliers/';
@@ -59,6 +61,10 @@ class ApiUrls {
   // Location Endpoints
   static const String locationList = '$baseUrl/locations/';
   static const String addLocation = '$baseUrl/locations/add/';
+
+
+  // Auth Endpoints
+  static const String passwordReset = '$baseUrl/password_reset/';
 
   // Signature Endpoints
   static const String uploadSignature = '$baseUrl/signature/upload/';

@@ -21,6 +21,14 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   String _errorMessage = '';
   final TextEditingController _searchController = TextEditingController();
 
+  List<String> _statuses = [
+    'instore',
+    'tested',
+    'default',
+    'onsite',
+    'pending_release'
+  ];
+
   @override
   void initState() {
     super.initState();

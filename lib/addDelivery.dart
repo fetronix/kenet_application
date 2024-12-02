@@ -36,6 +36,15 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
   final String apiUrl = ApiUrls.addconsignmenturl;
   final ImagePicker _imagePicker = ImagePicker();
 
+  String? _selectedStatus;
+  List<String> _statuses = [
+    'noc',
+    'netdev',
+    'bolt',
+    'dci',
+    'data_centre_infrastructure'
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -162,7 +171,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
               Text('Person Receiving: $personReceivingId'),
               Text('Quantity: $_quantityController'),
               Text('Invoice Number: $_invoiceNumberController'),
-              Text('Project: $_projectController'),
+              Text('Project: $_selectedStatus'),
               Text('Comments: $_commentsController'),
               Text('Supplier Name: ${_suppliers.firstWhere((supplier) => supplier['id'] == _selectedsupplierId)['name'] ?? "Not selected"}'),
               Text('File: ${_selectedFile?.path ?? "No file selected"}'),
@@ -176,7 +185,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                   'person_receiving': personReceivingId,
                   'quantity': _quantityController,
                   'invoice_number': _invoiceNumberController,
-                  'project': _projectController,
+                  'project': _selectedStatus,
                   'comments': _commentsController,
                   'supplier_name': _selectedsupplierId,
                 };
@@ -269,16 +278,28 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          TextField(
-                            onChanged: (value) {
-                              setState(() {
-                                _projectController = value;
-                              });
-                            },
-                            decoration: InputDecoration(
-                              labelText: 'Project',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0),
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(30.0), // Adjust the radius as needed
+                              border: Border.all(color: Colors.grey), // Set border color and width
+                            ),
+                            child: DropdownButtonFormField<String>(
+                              hint: const Text('Select Project'),
+                              value: _selectedStatus,
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedStatus = value;
+                                });
+                              },
+                              items: _statuses.map((status) {
+                                return DropdownMenuItem(
+                                  value: status,
+                                  child: Text(status),
+                                );
+                              }).toList(),
+                              decoration: InputDecoration(
+                                border: InputBorder.none, // Remove default border
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
                               ),
                             ),
                           ),
@@ -304,7 +325,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
                               ElevatedButton.icon(
                                 onPressed: () => _pickImage(ImageSource.camera),
                                 icon: const Icon(Icons.camera),
-                                label: const Text('Delivery Note/Invoice File Picture'),
+                                label: const Text('Take Picture'),
                               ),
                               ElevatedButton.icon(
                                 onPressed: _pickFile,

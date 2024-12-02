@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:kenet_application/shared_pref_helper.dart';
 import 'package:kenet_application/allUrls.dart';
 import 'package:kenet_application/home_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:developer';
 
 class LoginScreen extends StatefulWidget {
@@ -92,6 +93,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     _passwordController.dispose();
     _animationController.dispose();
     super.dispose();
+  }
+
+
+  void _launchForgotPasswordURL(String url) async {
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
   }
 
   /// Handles the login process
@@ -308,6 +318,25 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           ),
                         ),
                       ),
+                      const SizedBox(height: 20),
+                      GestureDetector(
+                        onTap: () {
+                          // Replace this with your password reset URL or navigation to password reset screen
+                          const url = ApiUrls.passwordReset; // Update with actual URL
+                          _launchForgotPasswordURL(url);
+                        },
+                        child: Center(  // Wrap the Text widget with a Center widget
+                          child: Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ),
+
                       if (_errorMessage.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 20),
