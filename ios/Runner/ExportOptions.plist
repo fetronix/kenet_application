@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plist version="1.0">
+  <dict>
+    <key>method</key>
+    <string>development</string> <!-- You can change this to 'app-store' or 'enterprise' depending on your needs -->
+    <key>destination</key>
+    <string>export</string>
+    <key>compileBitcode</key>
+    <true/>
+    <key>signingStyle</key>
+    <string>manual</string>
+    <key>teamID</key>
+    <string>YourAppleTeamID</string> <!-- Replace with your Apple Team ID -->
+    <key>provisioningProfiles</key>
+    <dict>
+      <key>com.KenetAssets.app</key> <!-- Replace with your app's bundle identifier -->
+      <string>YourProvisioningProfileName</string> <!-- Replace with your provisioning profile name -->
+    </dict>
+  </dict>
+</plist>
