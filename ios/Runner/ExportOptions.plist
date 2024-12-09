@@ -10,11 +10,11 @@
     <key>signingStyle</key>
     <string>manual</string>
     <key>teamID</key>
-    <string>YourAppleTeamID</string> <!-- Replace with your Apple Team ID -->
+    <string></string> <!-- Replace with your Apple Team ID -->
     <key>provisioningProfiles</key>
     <dict>
       <key>com.KenetAssets.app</key> <!-- Replace with your app's bundle identifier -->
-      <string>YourProvisioningProfileName</string> <!-- Replace with your provisioning profile name -->
+      <string></string> <!-- Replace with your provisioning profile name -->
     </dict>
   </dict>
 </plist>
