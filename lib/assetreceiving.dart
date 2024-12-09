@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:barcode_scan2/barcode_scan2.dart';
 import 'package:kenet_application/addDelivery.dart';
 import 'allUrls.dart';
+import 'location.dart';
 import 'shared_pref_helper.dart'; // Adjust the import based on your file structure
 
 class AssetReceiving extends StatefulWidget {
@@ -15,6 +18,15 @@ class AssetReceiving extends StatefulWidget {
 
 class _AssetReceivingState extends State<AssetReceiving> {
   final List<Map<String, dynamic>> _scannedAssets = [];
+
+  TextEditingController _searchController = TextEditingController();
+
+  Timer? _debounce;
+  late List<Location> _searchResults = []; //as Future<List<Location>>;
+  bool _isLoading = false;
+  late String location = '';
+
+
   String _assetDescription = '';
   String _assetDescriptionModel = '';
   String? _selectedStatus;
@@ -35,10 +47,12 @@ class _AssetReceivingState extends State<AssetReceiving> {
     'pending_release'
   ];
   List<Map<String, dynamic>> _filteredLocations = [];
-  final TextEditingController _searchController = TextEditingController();
+  // final TextEditingController _searchController = TextEditingController();
   String _serialPrefix = '';
 
   final String apiUrl = ApiUrls.apiUrl;
+  final String apiUrlSlOC = 'http://197.136.16.164:8000/app/api/locations/?search=';
+
   final String categoryApiUrl = ApiUrls.categoryApiUrl;
 
   final String deliveryApiUrl = ApiUrls.deliveryApiUrl;
@@ -49,8 +63,79 @@ class _AssetReceivingState extends State<AssetReceiving> {
     super.initState();
     _fetchCategories();
     _fetchDeliveries();
-    _fetchLocations();
-    _filteredLocations = _locations;
+
+    _searchController.addListener(() {
+      _onSearchChanged();
+    });
+
+    print("LOCATIONS FROM INIT");
+
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    // print("search cnahed");
+    _searchResults = [];
+    if (_debounce?.isActive ?? false) {
+      _debounce!.cancel();
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      if (_searchController.text.isNotEmpty) {
+        _fetchAllLocations(_searchController.text);
+      } else {
+        setState(() {
+          _searchController.clear();
+        });
+      }
+    });
+  }
+
+
+  Future<void> _fetchAllLocations(String query) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.get(Uri.parse("$apiUrlSlOC$query"));
+
+      if (response.statusCode == 200) {
+        List<dynamic> locations = jsonDecode(response.body);
+        final List<Location> locationsList = locations.map((json) => Location.fromJson(json)).toList();
+        print("LETS SEE LOCATIONS");
+        print(locationsList);
+
+        setState(() {
+          _searchResults = locationsList;
+        });
+
+        // return locationsList;
+      } else {
+        setState(() {
+          _searchResults = [];
+        });
+      }
+    } catch (error) {
+      print(error.toString());
+
+      setState(() {
+        _searchResults = [];
+      });
+
+      // return [];
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _fetchCategories() async {
@@ -89,32 +174,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
     }
   }
 
-  Future<void> _fetchLocations() async {
-    final response = await http.get(Uri.parse(locationApiUrl));
-    if (response.statusCode == 200) {
-      List<dynamic> locationList = jsonDecode(response.body);
-      setState(() {
-        _locations = locationList.map((location) => {
-          'id': location['id'],
-          'name': location['name'],
-        }).toList();
-        _filteredLocations = _locations;
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load locations: ${response.body}')),
-      );
-    }
-  }
 
-  void _filterLocations(String query) {
-    final filtered = _locations.where((location) {
-      return location['name'].toLowerCase().contains(query.toLowerCase());
-    }).toList();
-    setState(() {
-      _filteredLocations = filtered;
-    });
-  }
 
   Future<void> _saveAsset(Map<String, dynamic> asset) async {
     SharedPrefHelper sharedPrefHelper = SharedPrefHelper();
@@ -345,7 +405,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
                     'asset_description_model': item['assetDescriptionModel'],
                     'serial_number': item['serial'],
                     'kenet_tag': item['kenetTag'],
-                    'location': _location?['id'],
+                    'location': location,
                     'category': _selectedCategory?['id'],
                     'delivery': _selectedDelivery?['id'],
                     'status': _selectedStatus,
@@ -528,7 +588,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
               Text('Category: ${_selectedCategory != null ? _selectedCategory!['name'] : "Not Selected"}'),
               Text('Delivery: ${_selectedDelivery != null ? _selectedDelivery!['delivery_id'] : "Not Selected"}'),
               Text('Status: ${_selectedStatus ?? "Not Selected"}'),
-              Text('Location: ${_location != null ? _location!['name'] : "Not Selected"}'),
+              Text('Location: ${location ?? "Not Selected"}'),
               Text('Date: ${DateTime.now().toIso8601String()}'),
             ],
           ),
@@ -542,7 +602,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
                   'asset_description_model': _assetDescriptionModel,
                   'serial_number': serialNumber,
                   'kenet_tag': kenetTag,
-                  'location': _location?['id'],
+                  'location': location,
                   'category': _selectedCategory?['id'],
                   'delivery': _selectedDelivery?['id'],
                   'status': _selectedStatus,
@@ -562,234 +622,202 @@ class _AssetReceivingState extends State<AssetReceiving> {
     ) ?? false;
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Asset Receiving'),
       ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Container(
-              width: 400, // Set the width of the form here
-              child: Column(
+      body: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center, // Center the buttons horizontally
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                        child: OutlinedButton.icon(
-                          onPressed: _navigateToDeliveryReceiving,
-                          icon: Icon(Icons.add, color: Color(0xFF653D82)),
-                          label: Text('Register New Consignment', style: TextStyle(color: Color(0xFF653D82))),
-                          style: OutlinedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            side: BorderSide(color: Color(0xFF653D82), width: 2),
-                            padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(25),
-                            ),
-                          ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: OutlinedButton.icon(
+                      onPressed: _navigateToDeliveryReceiving,
+                      icon: Icon(Icons.add, color: Color(0xFF653D82)),
+                      label: Text('Register New Consignment', style: TextStyle(color: Color(0xFF653D82))),
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        side: BorderSide(color: Color(0xFF653D82), width: 2),
+                        padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Card(
-                    elevation: 4,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        children: [
-                          const SizedBox(height: 16),
-                          TextField(
-                            onChanged: (value) {
-                              setState(() {
-                                _assetDescription = value;
-                              });
-                            },
-                            decoration: InputDecoration(
-                              labelText: 'Asset Name. for example.... Hp Laptop',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Rounded border
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            onChanged: (value) {
-                              setState(() {
-                                _assetDescriptionModel = value;
-                              });
-                            },
-                            decoration: InputDecoration(
-                              labelText: 'Asset  Model. for example... 840 G3',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Rounded border
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30.0), // Adjust the radius as needed
-                              border: Border.all(color: Colors.grey), // Set border color and width
-                            ),
-                            child: DropdownButtonFormField<Map<String, dynamic>>(
-                              hint: const Text('Select Consignment to Asset'),
-                              value: _selectedDelivery,
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedDelivery = value;
-                                });
-                              },
-                              items: _deliveries.map((delivery) {
-                                return DropdownMenuItem<Map<String, dynamic>>(
-                                  value: delivery,
-                                  child: Text(
-                                    delivery['details'] ?? "No Details Available",
-                                    overflow: TextOverflow.ellipsis, // Handles overflow with ellipsis
-                                    maxLines: 1, // Only one line for text
-                                  ),
-                                );
-                              }).toList(),
-                              isExpanded: true, // Make sure dropdown stretches to fit
-                              decoration: InputDecoration(
-                                border: InputBorder.none, // Remove default border
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30.0), // Adjust the radius as needed
-                              border: Border.all(color: Colors.grey), // Set border color and width
-                            ),
-                            child: DropdownButtonFormField<Map<String, dynamic>>(
-                              hint: const Text('Select Category'),
-                              value: _selectedCategory,
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedCategory = value;
-                                });
-                              },
-                              items: _categories.map((category) {
-                                return DropdownMenuItem(
-                                  value: category,
-                                  child: Text(category['name']),
-                                );
-                              }).toList(),
-                              decoration: InputDecoration(
-                                border: InputBorder.none, // Remove default border
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30.0), // Adjust the radius as needed
-                              border: Border.all(color: Colors.grey), // Set border color and width
-                            ),
-                            child: DropdownButtonFormField<String>(
-                              hint: const Text('Select Status'),
-                              value: _selectedStatus,
-                              onChanged: (value) {
-                                setState(() {
-                                  _selectedStatus = value;
-                                });
-                              },
-                              items: _statuses.map((status) {
-                                return DropdownMenuItem(
-                                  value: status,
-                                  child: Text(status),
-                                );
-                              }).toList(),
-                              decoration: InputDecoration(
-                                border: InputBorder.none, // Remove default border
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 16),
-                          TextFormField(
-                            controller: _searchController,
-                            decoration: InputDecoration(
-                              labelText: 'Search Location',
-                              prefixIcon: Icon(Icons.search), // Adding search icon inside the search bar
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(30.0), // Making the border rounded
-                              ),
-                            ),
-                            onChanged: (query) {
-                              _filterLocations(query);
-                            },
-                          ),
-
-                          const SizedBox(height: 16),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(30.0), // Adjust the radius as needed
-                              border: Border.all(color: Colors.grey), // Set border color and width
-                            ),
-                            child: DropdownButtonFormField<Map<String, dynamic>>(
-                              hint: const Text('Select Location'),
-                              value: _location,
-                              onChanged: (value) {
-                                setState(() {
-                                  _location = value;
-                                });
-                              },
-                              items: _filteredLocations.map((location) {
-                                return DropdownMenuItem<Map<String, dynamic>>(
-                                  value: location,
-                                  child: Text(
-                                    location['name'] ?? "No Name Available", // Ensure there's a fallback value
-                                    overflow: TextOverflow.ellipsis, // Handle overflow with ellipsis
-                                    maxLines: 1, // Restrict to a single line
-                                  ),
-                                );
-                              }).toList(),
-                              isExpanded: true, // Make sure the dropdown stretches to fit the available space
-                              decoration: InputDecoration(
-                                border: InputBorder.none, // Remove default border
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          // Buttons for scanning
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: _physicalScan, // Method to handle physical barcode scan
-                                icon: Icon(Icons.qr_code_scanner),
-                                label: const Text("Physical Scanner"),
-                              ),
-                              ElevatedButton.icon(
-                                onPressed: _scanItem, // Method to handle camera scan
-                                icon: Icon(Icons.camera_alt),
-                                label: const Text("Camera Scan"),
-                              ),
-                            ],
-                          ),
-                        ],
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 16),
+              // Asset Name TextField
+              TextField(
+                onChanged: (value) {
+                  setState(() {
+                    _assetDescription = value;
+                  });
+                },
+                decoration: InputDecoration(
+                  labelText: 'Asset Name. for example.... Hp Laptop',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Asset Model TextField
+              TextField(
+                onChanged: (value) {
+                  setState(() {
+                    _assetDescriptionModel = value;
+                  });
+                },
+                decoration: InputDecoration(
+                  labelText: 'Asset Model. for example... 840 G3',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Select Consignment Dropdown
+              DropdownButtonFormField<Map<String, dynamic>>(
+                hint: const Text('Select Consignment to Asset'),
+                value: _selectedDelivery,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedDelivery = value;
+                  });
+                },
+                items: _deliveries.map((delivery) {
+                  return DropdownMenuItem<Map<String, dynamic>>(
+                    value: delivery,
+                    child: Text(
+                      delivery['details'] ?? "No Details Available",
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  );
+                }).toList(),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Select Category Dropdown
+              DropdownButtonFormField<Map<String, dynamic>>(
+                hint: const Text('Select Category'),
+                value: _selectedCategory,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedCategory = value;
+                  });
+                },
+                items: _categories.map((category) {
+                  return DropdownMenuItem(
+                    value: category,
+                    child: Text(category['name']),
+                  );
+                }).toList(),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Select Status Dropdown
+              DropdownButtonFormField<String>(
+                hint: const Text('Select Status'),
+                value: _selectedStatus,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedStatus = value;
+                  });
+                },
+                items: _statuses.map((status) {
+                  return DropdownMenuItem(
+                    value: status,
+                    child: Text(status),
+                  );
+                }).toList(),
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Search Location TextField
+              TextField(
+                controller: _searchController,
+                onSubmitted: (value) {
+                  setState(() {});
+                },
+                decoration: const InputDecoration(
+                  labelText: 'Search & select Location',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.search),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Search Results List
+              if (_isLoading)
+                const CircularProgressIndicator()
+              else if (!_isLoading && _searchResults.isNotEmpty)
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: NeverScrollableScrollPhysics(),
+                  itemCount: _searchResults.length,
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      title: Text(_searchResults[index].name),
+                      onTap: () {
+                        setState(() {
+                          location = _searchResults[index].name;
+                        });
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(_searchResults[index].name),
+                            duration: const Duration(milliseconds: 500),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              const SizedBox(height: 16),
+              // Buttons for Scanning
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: _physicalScan,
+                    icon: Icon(Icons.qr_code_scanner),
+                    label: const Text("Physical Scanner"),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: _scanItem,
+                    icon: Icon(Icons.camera_alt),
+                    label: const Text("Camera Scan"),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+
 }
 

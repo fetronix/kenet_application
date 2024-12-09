@@ -4,6 +4,7 @@ import 'login_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:io'; // Import for Platform class
 import 'package:url_launcher/url_launcher.dart';
 
 void main() {
@@ -21,7 +22,7 @@ class MyApp extends StatelessWidget {
       ),
       home: VersionCheckScreen(),
       routes: {
-        '/login': (context) => LoginScreen(), // Adjust the widget name as necessary
+        '/login': (context) => LoginScreen(),
       },
     );
   }
@@ -33,37 +34,55 @@ class VersionCheckScreen extends StatefulWidget {
 }
 
 class _VersionCheckScreenState extends State<VersionCheckScreen> {
-  // URL of your Django API endpoint that returns the latest version
   final String latestVersionUrl = ApiUrls.Appversion;
-
-  String latestVersion = "0.0.0"; // Default version in case of an error
+  String latestVersion = "0.0.0";
 
   @override
   void initState() {
     super.initState();
+    _showPlatformSnackbar();
     _checkForUpdate();
+  }
+
+  // Display a snackbar with the platform information
+  void _showPlatformSnackbar() {
+    String platform = "";
+    if (Platform.isAndroid) {
+      platform = "Android";
+    } else if (Platform.isIOS) {
+      platform = "iOS";
+    } else if (Platform.isLinux) {
+      platform = "Linux";
+    } else if (Platform.isWindows) {
+      platform = "Windows";
+    } else if (Platform.isMacOS) {
+      platform = "macOS";
+    } else if (Platform.isFuchsia) {
+      platform = "Fuchsia";
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Running on $platform")),
+      );
+    });
   }
 
   // Check if the app version is outdated
   void _checkForUpdate() async {
-    // Get the current version of the app
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
     String currentVersion = packageInfo.version;
 
-    // Fetch the latest version from your server
     try {
       final response = await http.get(Uri.parse(latestVersionUrl));
       if (response.statusCode == 200) {
         final Map<String, dynamic> data = json.decode(response.body);
-        latestVersion = data['latest_version']; // Get the latest version
-        String updateUrl = data['update_url']; // Get the update URL
+        latestVersion = data['latest_version'];
+        String updateUrl = data['update_url'];
 
-        // Compare versions
         if (_isUpdateAvailable(currentVersion, latestVersion)) {
-          // Show the update dialog if an update is available
           _showUpdateDialog(updateUrl);
         } else {
-          // If the version is up-to-date, navigate to the login screen
           _navigateToLogin();
         }
       } else {
@@ -74,12 +93,10 @@ class _VersionCheckScreenState extends State<VersionCheckScreen> {
     }
   }
 
-  // Compare current app version with the latest version
   bool _isUpdateAvailable(String currentVersion, String latestVersion) {
     return currentVersion != latestVersion;
   }
 
-  // Show the dialog to update the app
   void _showUpdateDialog(String updateUrl) {
     showDialog(
       context: context,
@@ -98,7 +115,6 @@ class _VersionCheckScreenState extends State<VersionCheckScreen> {
     );
   }
 
-  // Launch the app update URL (e.g., your server's URL for APK download)
   void _launchUpdateURL(String updateUrl) async {
     if (await canLaunch(updateUrl)) {
       await launch(updateUrl);
@@ -107,7 +123,6 @@ class _VersionCheckScreenState extends State<VersionCheckScreen> {
     }
   }
 
-  // Navigate to the login screen if the app is up-to-date
   void _navigateToLogin() {
     Navigator.pushReplacement(
       context,
@@ -117,7 +132,6 @@ class _VersionCheckScreenState extends State<VersionCheckScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Return a loading screen while checking for the update
     return Scaffold(
       appBar: AppBar(title: Text("Checking for Updates...")),
       body: Center(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:kenet_application/ReportsAdminpage.dart';
 import 'package:kenet_application/addDelivery.dart';
 import 'package:kenet_application/adminpage.dart';
 import 'package:kenet_application/allUrls.dart';
@@ -48,6 +49,11 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _cart = []; // Cart to hold selected assets
   bool _isLoading = true;
   String _errorMessage = '';
+
+  int _currentPage = 1;
+  final int _pageSize = 10;
+  bool _hasMore = true;
+
   final TextEditingController _searchController = TextEditingController();
   final TextEditingController _locationController = TextEditingController();
 
@@ -57,9 +63,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchAssets();
     _searchController.addListener(_filterAssets);
   }
-
   Future<void> _fetchAssets() async {
-    final url = ApiUrls.assetList;
+    final url = '${ApiUrls.assetList1}?page=$_currentPage&page_size=$_pageSize';
+
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
       final response = await http.get(
@@ -71,16 +80,19 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> fetchedAssets = jsonDecode(response.body);
+        final data = jsonDecode(response.body);
+        final List<dynamic> fetchedAssets = data['results'];
+        final bool hasMore = data['next'] != null;
 
         setState(() {
           _assets = fetchedAssets;
-          _filteredAssets = fetchedAssets;
+          _filteredAssets = _assets;
+          _hasMore = hasMore;
           _isLoading = false;
         });
       } else {
         setState(() {
-          _errorMessage = 'Failed to load assets. Status code: ${response.statusCode} - ${response.body}';
+          _errorMessage = 'Failed to load assets. Status code: ${response.statusCode}';
           _isLoading = false;
         });
       }
@@ -331,6 +343,25 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 }),
               SizedBox(height: 10),
+              if (widget.role == 'can_checkout_items')
+                _buildMenuButton('View All Users Dispatch Reports', Icons.admin_panel_settings, () {
+                  // Navigate to the Admin View page
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AdminReportScreen(
+                        id: widget.id,
+                        username: widget.username,
+                        firstName: widget.firstName,
+                        lastName: widget.lastName,
+                        email: widget.email,
+                        accessToken: widget.accessToken,
+                        refreshToken: widget.refreshToken,
+                      ),
+                    ),
+                  );
+                }),
+              SizedBox(height: 10),
               // New button to open the external URL
               if (widget.role == 'can_checkout_items')
               _buildMenuButton('Admin Portal', Icons.link, () {
@@ -361,6 +392,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
+  void _goToPreviousPage() {
+    if (_currentPage > 1) {
+      setState(() {
+        _currentPage--;
+      });
+      _fetchAssets();
+    }
+  }
+
+  void _goToNextPage() {
+    if (_hasMore) {
+      setState(() {
+        _currentPage++;
+      });
+      _fetchAssets();
+    }
+  }
 
 
 // Method to build a rounded button with an icon
@@ -524,6 +572,36 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
                 ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    OutlinedButton(
+                      onPressed: _currentPage > 1 ? _goToPreviousPage : null,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Color(0xFF653D82)), // KENET color for the border
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20), // Rounded edges
+                        ),
+                        backgroundColor: Colors.white, // Background color set to white
+                        foregroundColor: Colors.white, // Text color set to white
+                      ),
+                      child: Text('Previous'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _hasMore ? _goToNextPage : null,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Color(0xFF653D82)), // KENET color for the border
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20), // Rounded edges
+                        ),
+                        backgroundColor: Colors.white, // Background color set to white
+                        foregroundColor: Colors.white, // Text color set to white
+                      ),
+                      child: Text('Next'),
+                    ),
+                  ],
+                ),
+
 
               ],
             ),

@@ -7,8 +7,9 @@ import 'package:signature/signature.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:intl/intl.dart';
 
-class AdminScreen extends StatefulWidget {
+class AdminReportScreen extends StatefulWidget {
   final String id;
   final String username;
   final String firstName;
@@ -17,7 +18,7 @@ class AdminScreen extends StatefulWidget {
   final String accessToken;
   final String refreshToken;
 
-  const AdminScreen({
+  const AdminReportScreen({
     Key? key,
     required this.id,
     required this.username,
@@ -29,10 +30,10 @@ class AdminScreen extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  _AdminScreenState createState() => _AdminScreenState();
+  _AdminReportScreenState createState() => _AdminReportScreenState();
 }
 
-class _AdminScreenState extends State<AdminScreen> {
+class _AdminReportScreenState extends State<AdminReportScreen> {
   List<dynamic> checkoutItems = [];
   bool isLoading = true;
   String userDetails = "";
@@ -426,7 +427,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
-                                Text('Checkout Date: ${item['checkout_date']}'),
+                                Text('Dispatched Date: ${formatDate(item['checkout_date'])}'),
                                 item['pdf_file'] != null
                                     ? GestureDetector(
                                   onTap: () async {
@@ -447,59 +448,7 @@ class _AdminScreenState extends State<AdminScreen> {
                                 )
                                     : Container(),
                                 Divider(),
-                                Text(
-                                  'Cart Items:',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                                if (cartItems.isEmpty)
-                                  Text('No items in this checkout', style: TextStyle(color: Colors.red)),
-                                if (cartItems.isNotEmpty)
-                                  Column(
-                                    children: cartItems.map<Widget>((cartItem) {
-                                      final assetDetails = _extractAssetDetails(cartItem['asset']);
-                                      return Padding(
-                                        padding: const EdgeInsets.symmetric(vertical: 8.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text('Asset Name: ${assetDetails['name'] ?? 'N/A'}'),
-                                            Text('Serial Number: ${assetDetails['serial_number'] ?? 'N/A'}'),
-                                            Text('KNET Tag: ${assetDetails['kenet_tag'] ?? 'N/A'}'),
-                                            Text('New Location: ${assetDetails['new_location'] ?? 'N/A'}'),
-                                            Divider(),
-                                          ],
-                                        ),
-                                      );
-                                    }).toList(),
-                                  )
-                                else
-                                  Text('No items in the cart.'),
-                                // Conditionally render the button
-                                if (!hasOnSiteStatus && cartItems.isNotEmpty)
-                                  // if (cartItems.isNotEmpty)
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      bool isApproved = cartItems.any((cartItem) {
-                                        final assetDetails = _extractAssetDetails(cartItem['asset']);
-                                        return assetDetails['status'] == 'approved';
-                                      });
-
-                                      if (isApproved) {
-                                        _showCheckoutDialog(item['checkout_id']);
-                                      } else {
-                                        _approveCheckout(item['checkout_id']);
-                                      }
-                                    },
-                                    child: Text(
-                                      cartItems.any((cartItem) {
-                                        final assetDetails = _extractAssetDetails(cartItem['asset']);
-                                        return assetDetails['status'] == 'approved';
-                                      })
-                                          ? 'Release Asset'
-                                          : 'Approve',
-                                    ),
-                                  ),
-                              ],
+                                ]
                             ),
                           ),
                         ),
@@ -516,5 +465,22 @@ class _AdminScreenState extends State<AdminScreen> {
       ),
     );
   }
+
+  String formatDate(dynamic date) {
+    // Check if the date is already a DateTime object
+    DateTime parsedDate;
+    if (date is String) {
+      parsedDate = DateTime.parse(date); // If it's a string, parse it
+    } else if (date is DateTime) {
+      parsedDate = date; // If it's already a DateTime, use it directly
+    } else {
+      return 'Invalid date'; // Handle invalid date types
+    }
+
+    // Format the DateTime object
+    String formattedDate = DateFormat('MMMM d, yyyy').format(parsedDate);
+    return formattedDate;
+  }
+
 
 }

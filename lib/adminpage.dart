@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signature/signature.dart';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
+import 'package:url_launcher/url_launcher.dart';
 
 class AdminScreen extends StatefulWidget {
   final String id;
@@ -57,6 +58,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> jsonResponse = jsonDecode(response.body);
+        print(response.body);
 
         setState(() {
           checkoutItems = jsonResponse.map((item) {
@@ -68,7 +70,9 @@ class _AdminScreenState extends State<AdminScreen> {
                   ? DateTime.parse(item['checkout_date'])
                   : DateTime.now(),
               'remarks': item['remarks'] ?? 'No Remarks',
+              'pdf_file': item['pdf_file'] ?? 'No files',
               'cart_items': cartItems,
+
             };
           }).toList();
         });
@@ -423,6 +427,25 @@ class _AdminScreenState extends State<AdminScreen> {
                                   ),
                                 ),
                                 Text('Checkout Date: ${item['checkout_date']}'),
+                                item['pdf_file'] != null
+                                    ? GestureDetector(
+                                  onTap: () async {
+                                    String pdfUrl = item['pdf_file'];
+                                    if (await canLaunch(pdfUrl)) {
+                                      await launch(pdfUrl); // Opens the PDF in the browser or external PDF viewer
+                                    } else {
+                                      throw 'Could not open the PDF file.';
+                                    }
+                                  },
+                                  child: Text(
+                                    'View PDF',
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                )
+                                    : Container(),
                                 Divider(),
                                 Text(
                                   'Cart Items:',

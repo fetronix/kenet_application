@@ -261,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       TextFormField(
                         controller: _usernameController,
                         decoration: InputDecoration(
-                          labelText: 'Kenet Email',
+                          labelText: 'Kenet Username',
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(15),
                           ),
@@ -270,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your Kenet email';
+                            return 'Please enter your Kenet username';
                           }
                           return null;
                         },
