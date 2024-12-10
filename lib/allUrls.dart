@@ -18,6 +18,8 @@ class ApiUrls {
   static const String usersrurl = '$baseUrl/api/users/';
   static const String usersadminurl = '$baseUrl/api/user-checkouts/';
 
+  static const String locationsSearchUrl = 'http://197.136.16.164:8000/app/api/locations/?search=';
+
 
   // Checkout Endpoints
   static const String checkoutList = '$baseUrl/checkoutsadmin/';

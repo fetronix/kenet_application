@@ -19,6 +19,7 @@ class AssetReceiving extends StatefulWidget {
 class _AssetReceivingState extends State<AssetReceiving> {
   final List<Map<String, dynamic>> _scannedAssets = [];
   final TextEditingController _searchController = TextEditingController();
+  int _selectedLocationId = 0; // Initialize as an int
   Timer? _debounce;
   late List<Location> _searchResults = []; //as Future<List<Location>>;
   bool _isLoading = false;
@@ -192,7 +193,11 @@ class _AssetReceivingState extends State<AssetReceiving> {
                                   FocusScope.of(context).unfocus();
                                   _isSelected = true;
                                   _searchController.text = _searchResults[index].name;
-                                  location = _searchController.text;
+                                  _selectedLocationId = _searchResults[index].id; // Ensure it's a string
+                                  print("The location is: ");
+                                  print(_searchController.text);
+                                  print("The id is .....");
+                                  print(_selectedLocationId);
                                   _removeOverlay();
 
                                 });
@@ -338,6 +343,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
           ? _selectedDelivery!['details'] as String? ?? "Details not available"
           : "Not Selected";
       String selectedStatus = _selectedStatus ?? "Not Selected";
+      location = _selectedLocationId.toString();
       // String location =  ;
       String date = DateTime.now().toIso8601String();
 

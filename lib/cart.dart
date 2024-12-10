@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:kenet_application/allUrls.dart';
 import 'package:kenet_application/shared_pref_helper.dart';
+
+import 'location.dart';
 
 class CartScreen extends StatefulWidget {
   final String accessToken;
@@ -25,7 +28,18 @@ class _CartScreenState extends State<CartScreen> {
   List<Map<String, dynamic>> _users = [];
   List<Map<String, dynamic>> _filteredLocations = [];
   List<Map<String, dynamic>> _filteredUsers = [];
+
   final TextEditingController _searchController = TextEditingController();
+  int _selectedLocationId = 0; // Initialize as an int
+  Timer? _debounce;
+  late List<Location> _searchResults = []; //as Future<List<Location>>;
+  bool _isLoading = false;
+  bool _isSelected = false;
+  late String location = '';
+  String? _selectedLocation; // Holds the selected location
+  final String locationsUrl = 'http://197.136.16.164:8000/app/api/locations/?search=';
+  OverlayEntry? _overlayEntry;
+  final LayerLink _layerLink = LayerLink();
 
 
 
@@ -33,42 +47,165 @@ class _CartScreenState extends State<CartScreen> {
   void initState() {
     super.initState();
     _fetchCartItems();
-    _fetchLocations();
     _fetchUsers();
-    _filteredLocations = _locations;
     _filteredUsers = _users;
-  }
 
-  Future<void> _fetchLocations() async {
-    
-    print("FETCHING LOCATIONS");
-    final response = await http.get(Uri.parse(locationApiUrl));
-    if (response.statusCode == 200) {
-      List<dynamic> locationList = jsonDecode(response.body);
-      setState(() {
-        _locations = locationList.map((location) => {
-          'id': location['id'],
-          'name': location['name'],
-        }).toList();
-        _filteredLocations = _locations;
-      });
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load locations: ${response.body}')),
-      );
-    }
-
-    print("DONE FETCHING LOCATIONS");
-  }
-
-  void _filterLocations(String query) {
-    final filtered = _locations.where((location) {
-      return location['name'].toLowerCase().contains(query.toLowerCase());
-    }).toList();
-    setState(() {
-      _filteredLocations = filtered;
+    _searchController.addListener(() {
+      _onSearchChanged();
     });
   }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _debounce?.cancel();
+    _overlayEntry?.remove();
+
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    // print("search cnahed");
+
+    _removeOverlay();
+
+
+    if (_isSelected) {
+      _isSelected = false;
+      return;
+    }
+
+    _searchResults = [];
+    if (_debounce?.isActive ?? false) {
+      _debounce!.cancel();
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      print(_searchController.text);
+
+      if (location == _searchController.text) {
+        return;
+      }
+
+      if (_searchController.text.isNotEmpty) {
+        _fetchAllLocations(_searchController.text);
+      } else {
+        setState(() {
+          _searchController.clear();
+        });
+      }
+    });
+  }
+
+
+  Future<void> _fetchAllLocations(String query) async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final response = await http.get(Uri.parse("$locationsUrl$query"));
+
+      if (response.statusCode == 200) {
+        List<dynamic> locations = jsonDecode(response.body);
+        final List<Location> locationsList = locations.map((json) => Location.fromJson(json)).toList();
+        print("LETS SEE LOCATIONS");
+        print(locationsList);
+
+        for (var y in locationsList) {
+          print('${y.id}' '${y.name}' '${y.nameAlias}');
+        }
+
+        setState(() {
+          _searchResults = locationsList;
+        });
+
+        // return locationsList;
+      } else {
+        setState(() {
+          _searchResults = [];
+        });
+      }
+    } catch (error) {
+      print(error.toString());
+
+      setState(() {
+        _searchResults = [];
+      });
+
+      // return [];
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+
+      if (_overlayEntry == null) {
+        _showOverlay(context);
+      } else {
+        _updateOverlay();
+      }
+    }
+  }
+  void _showOverlay(BuildContext context) {
+    _overlayEntry = OverlayEntry(
+        builder: (context) => Positioned(
+            width: MediaQuery.of(context).size.width - 40,
+            child: CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              offset: const Offset(50, 50),
+              child: Material(
+                  elevation: 4.0,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.5, // Limit height to 50% of screen
+                    ),
+                    child: _isLoading
+                        ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                        : ListView.builder(
+                        padding: const EdgeInsets.all(4),
+                        shrinkWrap: true,
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          if (index < _searchResults.length) {
+                            return ListTile(
+                                title: Text(_searchResults[index].name),
+                                onTap: () {
+                                  FocusScope.of(context).unfocus();
+                                  _isSelected = true;
+                                  _searchController.text = _searchResults[index].name;
+                                  _selectedLocationId = _searchResults[index].id; // Ensure it's a string
+                                  print("The location is: ");
+                                  print(_searchController.text);
+                                  print("The id is .....");
+                                  print(_selectedLocationId);
+                                  _removeOverlay();
+
+                                });
+                          }
+                          return const Text('search entry not found');
+                        }),
+                  )),
+            )));
+
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _updateOverlay() {
+    _overlayEntry?.markNeedsBuild();
+  }
+
 
 
   Future<void> _fetchUsers() async {
@@ -233,48 +370,30 @@ class _CartScreenState extends State<CartScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextFormField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  labelText: 'Search Location',
-                  prefixIcon: Icon(Icons.search), // Adding search icon inside the search bar
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(30.0), // Making the border rounded
-                  ),
-                ),
-                onChanged: (query) {
-                  _filterLocations(query);
-                },
-              ),
 
               const SizedBox(height: 16),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30.0), // Adjust the radius as needed
-                  border: Border.all(color: Colors.grey), // Set border color and width
-                ),
-                child: DropdownButtonFormField<Map<String, dynamic>>(
-                  hint: const Text('Select Location'),
-                  value: _location,
-                  onChanged: (value) {
-                    setState(() {
-                      _location = value;
-                    });
-                  },
-                  items: _filteredLocations.map((location) {
-                    return DropdownMenuItem<Map<String, dynamic>>(
-                      value: location,
-                      child: Text(
-                        location['name'] ?? "No Name Available", // Ensure there's a fallback value
-                        overflow: TextOverflow.ellipsis, // Handle overflow with ellipsis
-                        maxLines: 1, // Restrict to a single line
-                      ),
-                    );
-                  }).toList(),
-                  isExpanded: true, // Make sure the dropdown stretches to fit the available space
+              CompositedTransformTarget(
+                link: _layerLink,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => _onSearchChanged(),
                   decoration: InputDecoration(
-                    border: InputBorder.none, // Remove default border
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0), // Add padding if needed
+                    hintText: 'Search and select location',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(30.0)), // Rounded corners
+                      borderSide: BorderSide(
+                        color: Colors.grey, // Border color
+                        width: 1.5, // Border width
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(30.0)),
+                      borderSide: BorderSide(
+                        // color: Colors.blue, // Border color when focused
+                        width: 2.0, // Border width when focused
+                      ),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0), // Padding inside the box
                   ),
                 ),
               ),
@@ -322,8 +441,8 @@ class _CartScreenState extends State<CartScreen> {
             ),
             TextButton(
               onPressed: () async {
-                if (_location!['name'] != null || _user!['username']  != null) {
-                  await _checkout(_location!['name'], _user!['username']);
+                if (_searchController.text != null || _user!['username']  != null) {
+                  await _checkout(_searchController.text, _user!['username']);
                   Navigator.of(context).pop();
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
