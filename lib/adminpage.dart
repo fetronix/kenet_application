@@ -18,7 +18,7 @@ class AdminScreen extends StatefulWidget {
   final String refreshToken;
 
   const AdminScreen({
-    Key? key,
+    super.key,
     required this.id,
     required this.username,
     required this.firstName,
@@ -26,7 +26,7 @@ class AdminScreen extends StatefulWidget {
     required this.email,
     required this.accessToken,
     required this.refreshToken,
-  }) : super(key: key);
+  });
 
   @override
   _AdminScreenState createState() => _AdminScreenState();

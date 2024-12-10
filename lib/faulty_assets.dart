@@ -20,8 +20,8 @@ class FaultyScreen extends StatefulWidget {
   final String accessToken;
 
   const FaultyScreen({
-    Key? key, required String title,required this.accessToken
-  }) : super(key: key);
+    super.key, required String title,required this.accessToken
+  });
 
   @override
   _FaultyScreenState createState() => _FaultyScreenState();
@@ -30,7 +30,7 @@ class FaultyScreen extends StatefulWidget {
 class _FaultyScreenState extends State<FaultyScreen> {
   List<dynamic> _assets = [];
   List<dynamic> _filteredAssets = [];
-  List<dynamic> _cart = []; // Cart to hold selected assets
+  final List<dynamic> _cart = []; // Cart to hold selected assets
   bool _isLoading = true;
   String _errorMessage = '';
   final TextEditingController _searchController = TextEditingController();
@@ -251,6 +251,7 @@ class _FaultyScreenState extends State<FaultyScreen> {
           ), // Background color
           padding: EdgeInsets.symmetric(vertical: 12), // Button padding
         ),
+        onPressed: onTap,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center, // Center align the content
           children: [
@@ -262,7 +263,6 @@ class _FaultyScreenState extends State<FaultyScreen> {
             ),
           ],
         ),
-        onPressed: onTap,
       ),
     );
   }

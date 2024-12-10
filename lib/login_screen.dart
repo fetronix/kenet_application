@@ -8,6 +8,8 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:developer';
 
 class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
+
   @override
   _LoginScreenState createState() => _LoginScreenState();
 }
@@ -362,7 +364,7 @@ class BLinkingLight extends StatelessWidget {
   final Animation<double> animation;
   final Color color;
 
-  const BLinkingLight({required this.animation, required this.color});
+  const BLinkingLight({super.key, required this.animation, required this.color});
 
   @override
   Widget build(BuildContext context) {

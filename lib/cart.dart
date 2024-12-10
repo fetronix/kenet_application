@@ -7,7 +7,7 @@ import 'package:kenet_application/shared_pref_helper.dart';
 class CartScreen extends StatefulWidget {
   final String accessToken;
 
-  const CartScreen({Key? key, required this.accessToken}) : super(key: key);
+  const CartScreen({super.key, required this.accessToken});
 
   @override
   _CartScreenState createState() => _CartScreenState();
@@ -175,7 +175,7 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  Future<void> _checkout(String location, String verify_user) async {
+  Future<void> _checkout(String location, String verifyUser) async {
     final checkoutUrl = ApiUrls.checkoutDetail;
     // Filter cartItems to include only those with status 'pending_release'
     final itemsForCheckout = cartItems
@@ -200,7 +200,7 @@ class _CartScreenState extends State<CartScreen> {
         body: jsonEncode({
           'cart_items': itemsForCheckout,
           'new_location': location,
-          'verified_user':verify_user, // Include new location in the request body
+          'verified_user':verifyUser, // Include new location in the request body
         }),
       );
 

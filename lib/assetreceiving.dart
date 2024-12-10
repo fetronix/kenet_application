@@ -10,7 +10,7 @@ import 'location.dart';
 import 'shared_pref_helper.dart'; // Adjust the import based on your file structure
 
 class AssetReceiving extends StatefulWidget {
-  const AssetReceiving({Key? key, required String title}) : super(key: key);
+  const AssetReceiving({super.key, required String title});
 
   @override
   State<AssetReceiving> createState() => _AssetReceivingState();
@@ -36,7 +36,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
   Map<String, dynamic>? _selectedDelivery;
   List<Map<String, dynamic>> _deliveries = [];
 
-  List<String> _statuses = [
+  final List<String> _statuses = [
     'instore',
     'tested',
     'default',
@@ -63,7 +63,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
     _searchController.addListener(() {
       _onSearchChanged();
     });
-    ;
 
 
   }
@@ -124,9 +123,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
         print("LETS SEE LOCATIONS");
         print(locationsList);
 
-        locationsList.forEach((y) {
+        for (var y in locationsList) {
           print('${y.id}' '${y.name}' '${y.nameAlias}');
-        });
+        }
 
         setState(() {
           _searchResults = locationsList;
@@ -316,7 +315,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
     String assetDescription = _assetDescription; // Get from the form, no additional input needed
     String assetDescriptionModel = _assetDescriptionModel; // Get from the form, no additional input needed
 
-    Future<void> _scanItem(int index) async {
+    Future<void> scanItem(int index) async {
       String? serialNumber = await _scanInput("Enter Serial Number for Item ${index + 1}");
       if (serialNumber == null) {
         _showSummary(scannedItems); // Show summary if canceled
@@ -356,12 +355,12 @@ class _AssetReceivingState extends State<AssetReceiving> {
       });
 
       if (index + 1 < itemCount) {
-        _scanItem(index + 1); // Scan next item
+        scanItem(index + 1); // Scan next item
       } else {
         _showSummary(scannedItems);
       }
     }
-    _scanItem(0);
+    scanItem(0);
   }
 
   Future<String?> _scanInput(String title) async {
@@ -412,7 +411,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
 
   void _showSummary(List<Map<String, String>> scannedItems) {
     List<Widget> summaryItems = [];
-    Set<String> uniqueIdentifiers = Set(); // To track unique identifiers
+    Set<String> uniqueIdentifiers = {}; // To track unique identifiers
     List<Map<String, String>> uniqueItems = []; // For storing unique items
     List<Map<String, String>> duplicateItems = []; // For storing duplicate items
     // Build the summary details for each scanned item
@@ -454,7 +453,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text("Scanned Items Summary"),
-          content: Container(
+          content: SizedBox(
             width: double.maxFinite, // Make the dialog width responsive
             child: SingleChildScrollView(
               child: Column(

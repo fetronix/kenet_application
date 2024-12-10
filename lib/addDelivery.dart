@@ -11,17 +11,17 @@ import 'dart:convert';
 
 
 class DeliveryReceiving extends StatefulWidget {
-  const DeliveryReceiving({Key? key, required String title}) : super(key: key);
+  const DeliveryReceiving({super.key, required String title});
 
   @override
   State<DeliveryReceiving> createState() => _DeliveryReceivingState();
 }
 
 class _DeliveryReceivingState extends State<DeliveryReceiving> {
-  String _supplierNameController = '';
+  final String _supplierNameController = '';
   String _quantityController = '';
   String _invoiceNumberController = '';
-  String _projectController = '';
+  final String _projectController = '';
   String _commentsController = '';
   String _personReceiving = ''; // For person receiving the asset
   String? _userId;
@@ -37,7 +37,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
   final ImagePicker _imagePicker = ImagePicker();
 
   String? _selectedStatus;
-  List<String> _statuses = [
+  final List<String> _statuses = [
     'noc',
     'netdev',
     'bolt',
@@ -218,7 +218,7 @@ class _DeliveryReceivingState extends State<DeliveryReceiving> {
 
           child: Padding(
             padding: const EdgeInsets.all(16.0),
-            child: Container(
+            child: SizedBox(
               width: 400,
               child: Column(
                 children: [

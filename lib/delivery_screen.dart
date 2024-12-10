@@ -8,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart'; // Import for launching URLs
 class DeliveriesScreen extends StatefulWidget {
   final String accessToken;
 
-  const DeliveriesScreen({Key? key, required this.accessToken}) : super(key: key);
+  const DeliveriesScreen({super.key, required this.accessToken});
 
   @override
   _DeliveriesScreenState createState() => _DeliveriesScreenState();
@@ -21,7 +21,7 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
   String _errorMessage = '';
   final TextEditingController _searchController = TextEditingController();
 
-  List<String> _statuses = [
+  final List<String> _statuses = [
     'instore',
     'tested',
     'default',
@@ -122,11 +122,11 @@ class _DeliveriesScreenState extends State<DeliveriesScreen> {
             SizedBox(height: 16),
             OutlinedButton(
               onPressed: _navigateToAddDelivery,
-              child: Text('Add Delivery'),
               style: OutlinedButton.styleFrom(
                 side: BorderSide(color: Color(0xFF653D82)), // Change to your desired border color
                 foregroundColor: Color(0xFF653D82), // Change to your desired text color
               ),
+              child: Text('Add Delivery'),
             ),
             SizedBox(height: 16),
             Expanded(

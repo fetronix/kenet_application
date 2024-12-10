@@ -28,7 +28,7 @@ class HomeScreen extends StatefulWidget {
   final String refreshToken;
 
   const HomeScreen({
-    Key? key,
+    super.key,
     required this.id,
     required this.username,
     required this.firstName,
@@ -37,7 +37,7 @@ class HomeScreen extends StatefulWidget {
     required this.role,
     required this.accessToken,
     required this.refreshToken,
-  }) : super(key: key);
+  });
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
@@ -46,7 +46,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _assets = [];
   List<dynamic> _filteredAssets = [];
-  List<dynamic> _cart = []; // Cart to hold selected assets
+  final List<dynamic> _cart = []; // Cart to hold selected assets
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -426,6 +426,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ), // Background color
           padding: EdgeInsets.symmetric(vertical: 12), // Button padding
         ),
+        onPressed: onTap,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center, // Center align the content
           children: [
@@ -437,7 +438,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        onPressed: onTap,
       ),
     );
   }

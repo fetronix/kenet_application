@@ -19,7 +19,7 @@ class CheckoutScreen extends StatefulWidget {
   final String refreshToken;
 
   const CheckoutScreen({
-    Key? key,
+    super.key,
     required this.id,
     required this.username,
     required this.firstName,
@@ -27,7 +27,7 @@ class CheckoutScreen extends StatefulWidget {
     required this.email,
     required this.accessToken,
     required this.refreshToken,
-  }) : super(key: key);
+  });
 
   @override
   _CheckoutScreenState createState() => _CheckoutScreenState();
