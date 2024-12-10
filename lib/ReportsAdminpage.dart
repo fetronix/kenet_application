@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:kenet_application/allUrls.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:signature/signature.dart';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:intl/intl.dart';

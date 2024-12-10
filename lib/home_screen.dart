@@ -6,16 +6,13 @@ import 'package:kenet_application/adminpage.dart';
 import 'package:kenet_application/allUrls.dart';
 import 'package:kenet_application/delivery_screen.dart';
 import 'package:kenet_application/faulty_assets.dart';
-import 'package:kenet_application/settings.dart';
 import 'package:kenet_application/shared_pref_helper.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'assetreceiving.dart'; // Import the asset receiving screen
 import 'cart.dart';
 import 'checkout_screen.dart';
 import 'login_screen.dart'; // Import the cart screen
-import 'package:webview_flutter/webview_flutter.dart';
 
 class HomeScreen extends StatefulWidget {
   final String id;

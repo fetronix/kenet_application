@@ -24,9 +24,9 @@ class _CartScreenState extends State<CartScreen> {
   final String locationApiUrl = ApiUrls.locationApiUrl;
   Map<String, dynamic>? _location;
   Map<String, dynamic>? _user;
-  List<Map<String, dynamic>> _locations = [];
+  final List<Map<String, dynamic>> _locations = [];
   List<Map<String, dynamic>> _users = [];
-  List<Map<String, dynamic>> _filteredLocations = [];
+  final List<Map<String, dynamic>> _filteredLocations = [];
   List<Map<String, dynamic>> _filteredUsers = [];
 
   final TextEditingController _searchController = TextEditingController();
