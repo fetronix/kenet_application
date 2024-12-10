@@ -19,7 +19,10 @@ class AssetReceiving extends StatefulWidget {
 class _AssetReceivingState extends State<AssetReceiving> {
   final List<Map<String, dynamic>> _scannedAssets = [];
   final TextEditingController _searchController = TextEditingController();
+<<<<<<< HEAD
   int _selectedLocationId = 0; // Initialize as an int
+=======
+>>>>>>> 913d089 (new final  updates)
   Timer? _debounce;
   late List<Location> _searchResults = []; //as Future<List<Location>>;
   bool _isLoading = false;
@@ -64,6 +67,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
     _searchController.addListener(() {
       _onSearchChanged();
     });
+    ;
 
 
   }
@@ -124,9 +128,15 @@ class _AssetReceivingState extends State<AssetReceiving> {
         print("LETS SEE LOCATIONS");
         print(locationsList);
 
+<<<<<<< HEAD
         for (var y in locationsList) {
           print('${y.id}' '${y.name}' '${y.nameAlias}');
         }
+=======
+        locationsList.forEach((y) {
+          print('${y.id}' '${y.name}' '${y.nameAlias}');
+        });
+>>>>>>> 913d089 (new final  updates)
 
         setState(() {
           _searchResults = locationsList;
@@ -193,11 +203,15 @@ class _AssetReceivingState extends State<AssetReceiving> {
                                   FocusScope.of(context).unfocus();
                                   _isSelected = true;
                                   _searchController.text = _searchResults[index].name;
+<<<<<<< HEAD
                                   _selectedLocationId = _searchResults[index].id; // Ensure it's a string
                                   print("The location is: ");
                                   print(_searchController.text);
                                   print("The id is .....");
                                   print(_selectedLocationId);
+=======
+                                  location = _searchController.text;
+>>>>>>> 913d089 (new final  updates)
                                   _removeOverlay();
 
                                 });
@@ -343,7 +357,10 @@ class _AssetReceivingState extends State<AssetReceiving> {
           ? _selectedDelivery!['details'] as String? ?? "Details not available"
           : "Not Selected";
       String selectedStatus = _selectedStatus ?? "Not Selected";
+<<<<<<< HEAD
       location = _selectedLocationId.toString();
+=======
+>>>>>>> 913d089 (new final  updates)
       // String location =  ;
       String date = DateTime.now().toIso8601String();
 
@@ -366,7 +383,11 @@ class _AssetReceivingState extends State<AssetReceiving> {
         _showSummary(scannedItems);
       }
     }
+<<<<<<< HEAD
     scanItem(0);
+=======
+    _scanItem(0);
+>>>>>>> 913d089 (new final  updates)
   }
 
   Future<String?> _scanInput(String title) async {
