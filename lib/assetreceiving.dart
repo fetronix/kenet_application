@@ -18,24 +18,21 @@ class AssetReceiving extends StatefulWidget {
 
 class _AssetReceivingState extends State<AssetReceiving> {
   final List<Map<String, dynamic>> _scannedAssets = [];
-
-  TextEditingController _searchController = TextEditingController();
-
+  final TextEditingController _searchController = TextEditingController();
   Timer? _debounce;
   late List<Location> _searchResults = []; //as Future<List<Location>>;
   bool _isLoading = false;
+  bool _isSelected = false;
   late String location = '';
-
-
+  String? _selectedLocation; // Holds the selected location
+  final String locationsUrl = 'http://197.136.16.164:8000/app/api/locations/?search=';
+  OverlayEntry? _overlayEntry;
+  final LayerLink _layerLink = LayerLink();
   String _assetDescription = '';
   String _assetDescriptionModel = '';
   String? _selectedStatus;
   Map<String, dynamic>? _selectedCategory;
   List<Map<String, dynamic>> _categories = [];
-
-  Map<String, dynamic>? _location;
-  List<Map<String, dynamic>> _locations = [];
-
   Map<String, dynamic>? _selectedDelivery;
   List<Map<String, dynamic>> _deliveries = [];
 
@@ -46,8 +43,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
     'onsite',
     'pending_release'
   ];
-  List<Map<String, dynamic>> _filteredLocations = [];
-  // final TextEditingController _searchController = TextEditingController();
+
   String _serialPrefix = '';
 
   final String apiUrl = ApiUrls.apiUrl;
@@ -67,8 +63,8 @@ class _AssetReceivingState extends State<AssetReceiving> {
     _searchController.addListener(() {
       _onSearchChanged();
     });
+    ;
 
-    print("LOCATIONS FROM INIT");
 
   }
 
@@ -76,18 +72,34 @@ class _AssetReceivingState extends State<AssetReceiving> {
   void dispose() {
     _searchController.dispose();
     _debounce?.cancel();
+    _overlayEntry?.remove();
 
     super.dispose();
   }
 
   void _onSearchChanged() {
     // print("search cnahed");
+
+    _removeOverlay();
+
+
+    if (_isSelected) {
+      _isSelected = false;
+      return;
+    }
+
     _searchResults = [];
     if (_debounce?.isActive ?? false) {
       _debounce!.cancel();
     }
 
     _debounce = Timer(const Duration(milliseconds: 500), () {
+      print(_searchController.text);
+
+      if (location == _searchController.text) {
+        return;
+      }
+
       if (_searchController.text.isNotEmpty) {
         _fetchAllLocations(_searchController.text);
       } else {
@@ -98,20 +110,23 @@ class _AssetReceivingState extends State<AssetReceiving> {
     });
   }
 
-
   Future<void> _fetchAllLocations(String query) async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final response = await http.get(Uri.parse("$apiUrlSlOC$query"));
+      final response = await http.get(Uri.parse("$locationsUrl$query"));
 
       if (response.statusCode == 200) {
         List<dynamic> locations = jsonDecode(response.body);
         final List<Location> locationsList = locations.map((json) => Location.fromJson(json)).toList();
         print("LETS SEE LOCATIONS");
         print(locationsList);
+
+        locationsList.forEach((y) {
+          print('${y.id}' '${y.name}' '${y.nameAlias}');
+        });
 
         setState(() {
           _searchResults = locationsList;
@@ -135,7 +150,69 @@ class _AssetReceivingState extends State<AssetReceiving> {
       setState(() {
         _isLoading = false;
       });
+
+      if (_overlayEntry == null) {
+        _showOverlay(context);
+      } else {
+        _updateOverlay();
+      }
     }
+  }
+
+  void _showOverlay(BuildContext context) {
+    _overlayEntry = OverlayEntry(
+        builder: (context) => Positioned(
+            width: MediaQuery.of(context).size.width - 40,
+            child: CompositedTransformFollower(
+              link: _layerLink,
+              showWhenUnlinked: false,
+              offset: const Offset(50, 50),
+              child: Material(
+                  elevation: 4.0,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.of(context).size.height * 0.5, // Limit height to 50% of screen
+                    ),
+                    child: _isLoading
+                        ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                        : ListView.builder(
+                        padding: const EdgeInsets.all(4),
+                        shrinkWrap: true,
+                        itemCount: _searchResults.length,
+                        itemBuilder: (context, index) {
+                          if (index < _searchResults.length) {
+                            return ListTile(
+                                title: Text(_searchResults[index].name),
+                                onTap: () {
+                                  FocusScope.of(context).unfocus();
+                                  _isSelected = true;
+                                  _searchController.text = _searchResults[index].name;
+                                  location = _searchController.text;
+                                  _removeOverlay();
+
+                                });
+                          }
+                          return const Text('search entry not found');
+                        }),
+                  )),
+            )));
+
+    Overlay.of(context).insert(_overlayEntry!);
+  }
+
+  void _removeOverlay() {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
+  }
+
+  void _updateOverlay() {
+    _overlayEntry?.markNeedsBuild();
   }
 
   Future<void> _fetchCategories() async {
@@ -155,7 +232,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
     }
   }
 
-
 // Method to fetch deliveries
   Future<void> _fetchDeliveries() async {
     final response = await http.get(Uri.parse(deliveryApiUrl));
@@ -173,7 +249,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
       );
     }
   }
-
 
 
   Future<void> _saveAsset(Map<String, dynamic> asset) async {
@@ -264,7 +339,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
           ? _selectedDelivery!['details'] as String? ?? "Details not available"
           : "Not Selected";
       String selectedStatus = _selectedStatus ?? "Not Selected";
-      String location = _location != null ? _location!['name'] : "Not Selected";
+      // String location =  ;
       String date = DateTime.now().toIso8601String();
 
       scannedItems.add({
@@ -286,7 +361,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
         _showSummary(scannedItems);
       }
     }
-
     _scanItem(0);
   }
 
@@ -336,15 +410,11 @@ class _AssetReceivingState extends State<AssetReceiving> {
     return inputValue; // Return the captured value or null
   }
 
-
-
-
   void _showSummary(List<Map<String, String>> scannedItems) {
     List<Widget> summaryItems = [];
     Set<String> uniqueIdentifiers = Set(); // To track unique identifiers
     List<Map<String, String>> uniqueItems = []; // For storing unique items
     List<Map<String, String>> duplicateItems = []; // For storing duplicate items
-
     // Build the summary details for each scanned item
     for (var item in scannedItems) {
       // Create a unique identifier for each item (combining serial and kenet tag)
@@ -379,7 +449,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
         ),
       );
     }
-
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -410,11 +479,9 @@ class _AssetReceivingState extends State<AssetReceiving> {
                     'delivery': _selectedDelivery?['id'],
                     'status': _selectedStatus,
                   };
-
                   // Call the method to save the asset
                   await _saveAsset(asset);
                 }
-
                 // Show a SnackBar if there were duplicates
                 if (duplicateItems.isNotEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -424,7 +491,6 @@ class _AssetReceivingState extends State<AssetReceiving> {
                     ),
                   );
                 }
-
                 // Close the dialog after saving
                 Navigator.of(context).pop(true);
               },
@@ -440,18 +506,12 @@ class _AssetReceivingState extends State<AssetReceiving> {
     );
   }
 
-
-
-
-
-
   Future<void> _scanItem() async {
     if (_assetDescription.isEmpty ||
         _assetDescriptionModel.isEmpty ||
         _selectedCategory == null ||
         _selectedDelivery == null ||
-        _selectedStatus == null ||
-        _location == null) {
+        _selectedStatus == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please fill in all required fields.')),
       );
@@ -757,44 +817,32 @@ class _AssetReceivingState extends State<AssetReceiving> {
                 ),
               ),
               const SizedBox(height: 16),
-              // Search Location TextField
-              TextField(
-                controller: _searchController,
-                onSubmitted: (value) {
-                  setState(() {});
-                },
-                decoration: const InputDecoration(
-                  labelText: 'Search & select Location',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.search),
+              CompositedTransformTarget(
+                link: _layerLink,
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) => _onSearchChanged(),
+                  decoration: InputDecoration(
+                    hintText: 'Search and select location',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(30.0)), // Rounded corners
+                      borderSide: BorderSide(
+                        color: Colors.grey, // Border color
+                        width: 1.5, // Border width
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(30.0)),
+                      borderSide: BorderSide(
+                        // color: Colors.blue, // Border color when focused
+                        width: 2.0, // Border width when focused
+                      ),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(vertical: 10.0, horizontal: 12.0), // Padding inside the box
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              // Search Results List
-              if (_isLoading)
-                const CircularProgressIndicator()
-              else if (!_isLoading && _searchResults.isNotEmpty)
-                ListView.builder(
-                  shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
-                  itemCount: _searchResults.length,
-                  itemBuilder: (context, index) {
-                    return ListTile(
-                      title: Text(_searchResults[index].name),
-                      onTap: () {
-                        setState(() {
-                          location = _searchResults[index].name;
-                        });
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(_searchResults[index].name),
-                            duration: const Duration(milliseconds: 500),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
+
               const SizedBox(height: 16),
               // Buttons for Scanning
               Row(
