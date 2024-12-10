@@ -47,7 +47,7 @@ class _AssetReceivingState extends State<AssetReceiving> {
   String _serialPrefix = '';
 
   final String apiUrl = ApiUrls.apiUrl;
-  final String apiUrlSlOC = 'http://197.136.16.164:8000/app/api/locations/?search=';
+
 
   final String categoryApiUrl = ApiUrls.categoryApiUrl;
 
