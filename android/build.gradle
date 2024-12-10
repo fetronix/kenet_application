@@ -1,7 +1,9 @@
 allprojects {
+    ext.kotlin_version = '1.9.10'
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://jitpack.io' }
     }
 }
 

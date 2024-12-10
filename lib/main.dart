@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io'; // Import for Platform class
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart'; // Import for kIsWeb
 
 void main() {
   runApp(MyApp());
@@ -47,7 +48,10 @@ class _VersionCheckScreenState extends State<VersionCheckScreen> {
   // Display a snackbar with the platform information
   void _showPlatformSnackbar() {
     String platform = "";
-    if (Platform.isAndroid) {
+
+    if (kIsWeb) {
+      platform = "Web";
+    } else if (Platform.isAndroid) {
       platform = "Android";
     } else if (Platform.isIOS) {
       platform = "iOS";
@@ -81,7 +85,13 @@ class _VersionCheckScreenState extends State<VersionCheckScreen> {
         String updateUrl = data['update_url'];
 
         if (_isUpdateAvailable(currentVersion, latestVersion)) {
-          _showUpdateDialog(updateUrl);
+          if (Platform.isAndroid) {
+            _launchPlayStoreUpdate(updateUrl); // For Android, open Play Store
+          } else if (Platform.isIOS) {
+            _launchAppStoreUpdate(updateUrl); // For iOS, open App Store
+          } else {
+            _showUpdateDialog(updateUrl); // For other platforms, show dialog
+          }
         } else {
           _navigateToLogin();
         }
@@ -120,6 +130,24 @@ class _VersionCheckScreenState extends State<VersionCheckScreen> {
       await launch(updateUrl);
     } else {
       throw 'Could not launch $updateUrl';
+    }
+  }
+
+  // Launch the Play Store for updating the app
+  void _launchPlayStoreUpdate(String updateUrl) async {
+    if (await canLaunch(updateUrl)) {
+      await launch(updateUrl);
+    } else {
+      throw 'Could not launch Play Store update URL';
+    }
+  }
+
+  // Launch the App Store for updating the app
+  void _launchAppStoreUpdate(String updateUrl) async {
+    if (await canLaunch(updateUrl)) {
+      await launch(updateUrl);
+    } else {
+      throw 'Could not launch KENET Store update URL';
     }
   }
 
