@@ -1,11 +1,11 @@
-name: iOS-ipa-build
+name: iOS-KEnet
 
 on:
   workflow_dispatch:
 
 jobs:
   build-ios:
-    name: 🎉 iOS Build new
+    name: 🎉 iOS Build ios app
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v3
