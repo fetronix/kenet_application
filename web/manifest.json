@@ -1,6 +1,6 @@
 {
-    "name": "kenet_application",
-    "short_name": "kenet_application",
+    "name": "KENET Assets",
+    "short_name": "KENET Assets",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
