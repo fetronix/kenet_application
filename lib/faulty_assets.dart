@@ -107,6 +107,31 @@ class _FaultyScreenState extends State<FaultyScreen> {
     }
   }
 
+  Future<void> _returnStoreAssetStatus(int assetId) async {
+    final updateUrl = ApiUrls.returnAssetDetail(assetId);
+    try {
+      final response = await http.patch(
+        Uri.parse(updateUrl),
+        headers: {
+          'Authorization': 'Bearer ${widget.accessToken}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'status': "faulty"}),
+      );
+
+      if (response.statusCode == 200) {
+        print('Asset status updated successfully.');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Asset return  successfully.')),
+        );
+      } else {
+        print('Failed to update asset status: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error updating asset status: $e');
+    }
+  }
+
   Future<void> _DecommissionupdateAssetStatus(int assetId) async {
     final updateUrl = ApiUrls.decommissionedAssetDetail(assetId);
     try {
@@ -140,7 +165,7 @@ class _FaultyScreenState extends State<FaultyScreen> {
           title: Text('Asset: ${asset['asset_description']}'),
           content: asset['status'] == 'faulty' || asset['status'] == 'decommissioned'
               ? Text('This asset is already faulty or decommissioned. Kindly check other items.')
-              : Text('Do you want to return this asset and mark it as Faulty or Decommissioned?'),
+              : Text('Do you want to return this asset and mark it as Faulty or Decommissioned? or Instore?'),
           actions: [
             TextButton(
               onPressed: () {
@@ -156,6 +181,14 @@ class _FaultyScreenState extends State<FaultyScreen> {
                   Navigator.of(context).pop(); // Close the dialog after action
                 },
                 child: Text('Faulty Asset'),
+              ),
+            if (asset['status'] != 'faulty' && asset['status'] != 'decommissioned')
+              ElevatedButton(
+                onPressed: () async {
+                  await _returnStoreAssetStatus(asset['id']); // Pass asset['id'] as integer here
+                  Navigator.of(context).pop(); // Close the dialog after action
+                },
+                child: Text('Return to Store'),
               ),
             // Show the Decommission Asset button only if it's not already decommissioned
             if (asset['status'] != 'decommissioned' && asset['status'] != 'faulty')

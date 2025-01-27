@@ -36,6 +36,7 @@ class ApiUrls {
   static const String assetList1 = '$baseUrl/api/assets/';
   static String getAssetDetail(int assetId) => '$baseUrl/assets/$assetId/';  // Asset endpoint with assetId
   static String faultyAssetDetail(int assetId) => '$baseUrl/assets/$assetId/return_faulty/';  // Asset endpoint with assetId
+  static String returnAssetDetail(int assetId) => '$baseUrl/assets/$assetId/return_store/';  // Asset endpoint with assetId
   static String decommissionedAssetDetail(int assetId) => '$baseUrl/assets/$assetId/return_decommissioned/';  // Asset endpoint with assetId
   static String removecart(int assetId) => '$baseUrl/cart/remove/$assetId/';  // Asset endpoint with assetId
 
